@@ -22,6 +22,7 @@ var (
 	throttle chan string
 	structs  chan string
 	files    chan string
+	allDone  chan bool
 
 	wg     sync.WaitGroup
 	rgx, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
@@ -45,6 +46,7 @@ func main() {
 	throttle = make(chan string)
 	// structs = make(chan string, 2)
 	files = make(chan string)
+	allDone = make(chan bool)
 
 	res, err := http.Get("https://dev.skuvault.com/reference")
 	if err != nil {
@@ -52,31 +54,38 @@ func main() {
 	}
 
 	doc := html.NewTokenizer(res.Body)
-
+	wg.Add(1)
 	go func() {
-		println("start")
-		propStr := <-propCh
-		println("propStr")
-		nameStr := <-nameCh
-		println("nameStr")
-		throttleStr := <-throttle
-		println("throttleStr")
-		infoStr := <-info
-		println("infoStr")
-		filesStr := <-files
-		println("filesStr")
-		// structsStr := <-structs
+		for {
+			select {
+			case <-allDone:
+				wg.Done()
+				return
+			default:
+				println("start")
+				propStr := <-propCh
+				println("propStr")
+				nameStr := <-nameCh
+				println("nameStr")
+				throttleStr := <-throttle
+				println("throttleStr")
+				infoStr := <-info
+				println("infoStr")
+				filesStr := <-files
+				println("filesStr")
+				// structsStr := <-structs
 
-		tags := templateTags{
-			Proper:   propStr,
-			Throttle: throttleStr,
-			Name:     nameStr,
-			Info:     infoStr,
-			File:     filesStr,
-			File0:    string(filesStr[0]),
-		}
+				tags := templateTags{
+					Proper:   propStr,
+					Throttle: throttleStr,
+					Name:     nameStr,
+					Info:     infoStr,
+					File:     filesStr,
+					File0:    string(filesStr[0]),
+				}
 
-		funcTemp := `// {{.Proper}} creates http request for this SKU vault endpoint
+				funcTemp := `
+		// {{.Proper}} creates http request for this SKU vault endpoint
 		// {{.Throttle}} Throttle
 		// {{.Info}}
 		func (lc *PLoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
@@ -90,21 +99,24 @@ func main() {
 			return response
 		}`
 
-		f, err := os.Create("test.go")
-		if err != nil {
-			log.Panicln(err)
-		}
-		tmp, err := template.New("test").Parse(funcTemp)
-		if err != nil {
-			log.Panicln(err)
-		}
-		err = tmp.Execute(f, tags)
-		if err != nil {
-			log.Panicln(err)
+				f, err := os.Create("test.go")
+				if err != nil {
+					log.Panicln(err)
+				}
+				tmp, err := template.New("test").Parse(funcTemp)
+				if err != nil {
+					log.Panicln(err)
+				}
+				err = tmp.Execute(f, tags)
+				if err != nil {
+					log.Panicln(err)
+				}
+			}
 		}
 	}()
 
 	getEndPoints(doc)
+	wg.Wait()
 }
 
 func getEndPoints(doc *html.Tokenizer) {
@@ -115,6 +127,7 @@ func getEndPoints(doc *html.Tokenizer) {
 
 		switch toks {
 		case html.ErrorToken:
+			allDone <- true
 			return
 		case html.StartTagToken:
 			tok := doc.Token()
