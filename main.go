@@ -59,12 +59,12 @@ func main() {
 		println("propStr")
 		nameStr := <-nameCh
 		println("nameStr")
-		filesStr := <-files
-		println("filesStr")
 		throttleStr := <-throttle
 		println("throttleStr")
 		infoStr := <-info
 		println("infoStr")
+		filesStr := <-files
+		println("filesStr")
 		// structsStr := <-structs
 
 		tags := templateTags{
@@ -84,7 +84,7 @@ func main() {
 				{{.Proper}}:       pld,
 				{{.File0}}LoginCredentials: lc,
 			}
-		
+
 			response := &{{.File}}.{{.Proper}}Response{}
 			{{.File}}Call(credPld, response, {{.Name}})
 			return response
@@ -123,18 +123,21 @@ func getEndPoints(doc *html.Tokenizer) {
 				full := doc.Token().Data
 				name = strings.Replace(full, "/", "", -1)
 				proper := strings.Title(name)
-				propCh <- proper
-				println("AFTER")
-				nameCh <- name
-				println("AFTER?")
-				// fmt.Println(proper)
+
+				if proper != "Developing For SkuVault" {
+					propCh <- proper
+					fmt.Println(proper)
+					println("AFTER")
+					nameCh <- name
+					println("AFTER?")
+				}
+
 				continue
 			}
 
 			if tok.Data == "div" {
 				for _, att := range tok.Attr {
 					if att.Val == "excerpt" {
-						println("test")
 						count := 0
 					out:
 						for {
@@ -148,11 +151,17 @@ func getEndPoints(doc *html.Tokenizer) {
 								if !rgx.MatchString(tok.Data) {
 									count++
 									first := th2.ReplaceAllString(tok.Data, "")
-									// fmt.Println(first)
-
-									println("test")
-									throttle <- first
-									println("test?")
+									fmt.Println(first)
+									println(count)
+									if count == 1 {
+										println("throttle")
+										throttle <- first
+										println("throttle?")
+										continue
+									}
+									println(first)
+									info <- first
+									println("info?")
 
 								}
 							case html.EndTagToken:
@@ -202,7 +211,7 @@ func getEndPoints(doc *html.Tokenizer) {
 					}
 
 					if att.Val == "definition-url" {
-						println("test2")
+						// println("test2")
 						var done bool
 					out3:
 						for {
@@ -212,7 +221,14 @@ func getEndPoints(doc *html.Tokenizer) {
 							case toks == html.TextToken:
 								url, _ := regexp.Compile(`app.skuvault.com/api/`)
 								file = url.ReplaceAllString(tok.Data, "")
-								fmt.Println(url.ReplaceAllString(tok.Data, ""))
+								if file == "app.skuvault.com/api" {
+									toks = doc.Next()
+									tok = doc.Token()
+									otherURL := strings.Split(tok.Data, "/")
+									file = otherURL[0]
+								}
+								fmt.Println(file)
+
 								println("test2")
 								files <- file
 								println("test2?")
