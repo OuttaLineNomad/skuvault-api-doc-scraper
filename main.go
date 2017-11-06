@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -14,25 +16,100 @@ import (
 )
 
 var (
-	dCh    chan *html.Tokenizer
+	nameCh   chan string
+	propCh   chan string
+	info     chan string
+	throttle chan string
+	structs  chan string
+	files    chan string
+
 	wg     sync.WaitGroup
 	rgx, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
 	th2, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?`)
 	nl, _  = regexp.Compile(`\n`)
 )
 
+type templateTags struct {
+	Proper   string
+	Throttle string
+	Name     string
+	Info     string
+	File     string
+	File0    string
+}
+
 func main() {
+	nameCh = make(chan string)
+	propCh = make(chan string)
+	info = make(chan string)
+	throttle = make(chan string)
+	// structs = make(chan string, 2)
+	files = make(chan string)
+
 	res, err := http.Get("https://dev.skuvault.com/reference")
 	if err != nil {
 		log.Panicln(err)
 	}
 
 	doc := html.NewTokenizer(res.Body)
+
+	go func() {
+		println("start")
+		propStr := <-propCh
+		println("propStr")
+		nameStr := <-nameCh
+		println("nameStr")
+		filesStr := <-files
+		println("filesStr")
+		throttleStr := <-throttle
+		println("throttleStr")
+		infoStr := <-info
+		println("infoStr")
+		// structsStr := <-structs
+
+		tags := templateTags{
+			Proper:   propStr,
+			Throttle: throttleStr,
+			Name:     nameStr,
+			Info:     infoStr,
+			File:     filesStr,
+			File0:    string(filesStr[0]),
+		}
+
+		funcTemp := `// {{.Proper}} creates http request for this SKU vault endpoint
+		// {{.Throttle}} Throttle
+		// {{.Info}}
+		func (lc *PLoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
+			credPld := &post{{.Proper}} {
+				{{.Proper}}:       pld,
+				{{.File0}}LoginCredentials: lc,
+			}
+		
+			response := &{{.File}}.{{.Proper}}Response{}
+			{{.File}}Call(credPld, response, {{.Name}})
+			return response
+		}`
+
+		f, err := os.Create("test.go")
+		if err != nil {
+			log.Panicln(err)
+		}
+		tmp, err := template.New("test").Parse(funcTemp)
+		if err != nil {
+			log.Panicln(err)
+		}
+		err = tmp.Execute(f, tags)
+		if err != nil {
+			log.Panicln(err)
+		}
+	}()
+
 	getEndPoints(doc)
 }
 
 func getEndPoints(doc *html.Tokenizer) {
 	name := ""
+	file := ""
 	for {
 		toks := doc.Next()
 
@@ -41,18 +118,23 @@ func getEndPoints(doc *html.Tokenizer) {
 			return
 		case html.StartTagToken:
 			tok := doc.Token()
-
 			if tok.Data == "h2" {
 				toks = doc.Next()
 				full := doc.Token().Data
 				name = strings.Replace(full, "/", "", -1)
-				fmt.Println(strings.Title(name))
+				proper := strings.Title(name)
+				propCh <- proper
+				println("AFTER")
+				nameCh <- name
+				println("AFTER?")
+				// fmt.Println(proper)
 				continue
 			}
 
 			if tok.Data == "div" {
 				for _, att := range tok.Attr {
 					if att.Val == "excerpt" {
+						println("test")
 						count := 0
 					out:
 						for {
@@ -66,7 +148,12 @@ func getEndPoints(doc *html.Tokenizer) {
 								if !rgx.MatchString(tok.Data) {
 									count++
 									first := th2.ReplaceAllString(tok.Data, "")
-									fmt.Println(first)
+									// fmt.Println(first)
+
+									println("test")
+									throttle <- first
+									println("test?")
+
 								}
 							case html.EndTagToken:
 								if tok.Data == "p" {
@@ -79,6 +166,7 @@ func getEndPoints(doc *html.Tokenizer) {
 			}
 
 			if tok.Data == "span" {
+
 				jsons := ""
 				for _, att := range tok.Attr {
 					if att.Val == "cm-s-tomorrow-night" {
@@ -101,7 +189,7 @@ func getEndPoints(doc *html.Tokenizer) {
 										f2 = ok2.ReplaceAllString(f1, `}}]`)
 									}
 									jRead := strings.NewReader(f2)
-									b, err := gojson.Generate(jRead, gojson.ParseJson, name, "test", nil, true)
+									b, err := gojson.Generate(jRead, gojson.ParseJson, name, file, nil, true)
 									if err != nil {
 										println(f2)
 										log.Panicln(err)
@@ -114,6 +202,7 @@ func getEndPoints(doc *html.Tokenizer) {
 					}
 
 					if att.Val == "definition-url" {
+						println("test2")
 						var done bool
 					out3:
 						for {
@@ -122,7 +211,11 @@ func getEndPoints(doc *html.Tokenizer) {
 							switch {
 							case toks == html.TextToken:
 								url, _ := regexp.Compile(`app.skuvault.com/api/`)
+								file = url.ReplaceAllString(tok.Data, "")
 								fmt.Println(url.ReplaceAllString(tok.Data, ""))
+								println("test2")
+								files <- file
+								println("test2?")
 								done = true
 							case done:
 								break out3
