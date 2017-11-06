@@ -1,7 +1,8 @@
-﻿Developing for SkuVault
-/addItem
+Developing For SkuVault
+AddItem
 Moderate
 Add quantity to a warehouse location. 
+inventory
 package test
 
 type addItem struct {
@@ -21,9 +22,10 @@ type addItem struct {
 	AddItemStatus string ``
 }
 
-/addItemBulk
+AddItemBulk
 Moderate
 Add quantity to warehouse locations, 100 at a time.
+inventory
 package test
 
 type addItemBulk struct {
@@ -54,9 +56,10 @@ type addItemBulk_sub1 struct {
 	Sku           string   ``
 }
 
-/addShipments
+AddShipments
 Heavy
 Using this call, users can add shipments to a sale.
+sales
 package test
 
 type addShipments struct {
@@ -147,8 +150,9 @@ type addShipments struct {
 	Status string        ``
 }
 
-/createBrands
+CreateBrands
 Moderate
+products
 package test
 
 type createBrands struct {
@@ -168,8 +172,9 @@ type createBrands struct {
 	Status string        ``
 }
 
-/createHolds
+CreateHolds
 Moderate
+sales
 package test
 
 type createHolds struct {
@@ -192,9 +197,10 @@ type createHolds []struct {
 	Sku      string ``
 }
 
-/createKit
+CreateKit
 Moderate
 Using this call, users may create a kit inside of SkuVault.
+products
 package test
 
 type createKit struct {
@@ -221,9 +227,10 @@ type createKit struct {
 	Success string   ``
 }
 
-/createPO
+CreatePO
 Moderate
 This call let's you create a PO using our API.
+purchaseorders
 package test
 
 type createPO struct {
@@ -276,9 +283,10 @@ type createPO struct {
 	CreatePOStatus string ``
 }
 
-/createProduct
+CreateProduct
 Moderate
 Create products in SkuVault one at a time. Bulk version available: 
+products
 package test
 
 type createProduct struct {
@@ -329,9 +337,10 @@ type createProduct struct {
 	Status string   ``
 }
 
-/createProducts
+CreateProducts
 Heavy
 Create 100 products per request.
+products
 package test
 
 type createProducts struct {
@@ -398,9 +407,10 @@ type createProducts struct {
 	Status string        ``
 }
 
-/createSuppliers
+CreateSuppliers
 Moderate
 Returns the list of current Suppliers in a SkuVault account.
+products
 package test
 
 type createSuppliers struct {
@@ -422,9 +432,10 @@ type createSuppliers struct {
 	Errors []string ``
 }
 
-/getAvailableQuantities
+GetAvailableQuantities
 Heavy
 Retrieve a list of SKUs and their total available quantities across all warehouses. Available Quantity is the quantity that is actually available to sell across all your sales channels.
+inventory
 package test
 
 type getAvailableQuantities struct {
@@ -450,9 +461,10 @@ type getAvailableQuantities_sub1 struct {
 	Sku                     string ``
 }
 
-/getBrands
+GetBrands
 Heavy
 Returns a list of Brands created in SkuVault.
+products
 package test
 
 type getBrands struct {
@@ -472,9 +484,10 @@ type getBrands_sub1 struct {
 	Name      string ``
 }
 
-/getClassifications
+GetClassifications
 Heavy
 Returns classifications and, if they exist, their named attributes.
+products
 package test
 
 type getClassifications struct {
@@ -502,9 +515,10 @@ type getClassifications_sub1 struct {
 	Values     []string ``
 }
 
-/getExternalWarehouseQuantities
+GetExternalWarehouseQuantities
 Heavy
 This call gets the quantities in a designated External Warehouse. Please note these are different than ordinary warehouses.
+inventory
 package test
 
 type getExternalWarehouseQuantities struct {
@@ -532,9 +546,10 @@ type getExternalWarehouseQuantities_sub1 struct {
 	TransferQuantity int64  ``
 }
 
-/getExternalWarehouses
+GetExternalWarehouses
 Moderate
 Returns your external warehouses. No page parameters.
+inventory
 package test
 
 type getExternalWarehouses struct {
@@ -553,8 +568,9 @@ type getExternalWarehouses_sub1 struct {
 	ID   string ``
 }
 
-/getIncomingItems
+GetIncomingItems
 Get incoming items for incomplete purchase orders
+purchaseorders
 package test
 
 type getIncomingItems struct {
@@ -578,9 +594,10 @@ type getIncomingItems_sub1 struct {
 	TotalPrice int64  ``
 }
 
-/getIntegrations
+GetIntegrations
 Severe
 Returns a list of your enabled channel accounts. No page parameters.
+integration
 package test
 
 type getIntegrations struct {
@@ -601,9 +618,10 @@ type getIntegrations_sub1 struct {
 	Type   string ``
 }
 
-/getInventoryByLocation
+GetInventoryByLocation
 Heavy
 Returns location and warehouse per product.
+inventory
 package test
 
 type getInventoryByLocation struct {
@@ -634,9 +652,10 @@ type getInventoryByLocation_sub2 struct {
 	SKU_as_Key []getInventoryByLocation_sub1 ``
 }
 
-/getItemQuantities
+GetItemQuantities
 Heavy
 Returns product quantities.
+inventory
 package test
 
 type getItemQuantities struct {
@@ -666,9 +685,10 @@ type getItemQuantities_sub1 struct {
 	TotalOnHand             int64  ``
 }
 
-/getKitQuantities
+GetKitQuantities
 Heavy
 Returns kit quantities.
+inventory
 package test
 
 type getKitQuantities struct {
@@ -691,9 +711,10 @@ type getKitQuantities_sub1 struct {
 	Sku                     string ``
 }
 
-/getKits
+GetKits
 Heavy
 Returns kit details.
+products
 package test
 
 type getKits struct {
@@ -740,9 +761,10 @@ type getKits_sub2 struct {
 	Quantity int64          ``
 }
 
-/getOnlineSaleStatus
+GetOnlineSaleStatus
 Heavy
 Returns a list of sales and their statuses.
+sales
 package test
 
 type getOnlineSaleStatus struct {
@@ -772,9 +794,10 @@ type getOnlineSaleStatus_sub1 struct {
 	Sku                  string ``
 }
 
-/getPOs
+GetPOs
 Heavy
 Returns a list of purchase orders.
+purchaseorders
 package test
 
 type getPOs struct {
@@ -836,9 +859,10 @@ type getPOs_sub1 struct {
 	Variant               string ``
 }
 
-/getProducts
+GetProducts
 Heavy
 This call returns product(not kit) details. The date parameters include updating details as well as product creation. Details do not include quantity.
+products
 package test
 
 type getProducts struct {
@@ -914,9 +938,10 @@ type getProducts_sub1 struct {
 	Value string ``
 }
 
-/getReceivesHistory
+GetReceivesHistory
 Heavy
 Returns a list of purchase order receives and receipts.
+purchaseorders
 package test
 
 type getReceivesHistory struct {
@@ -973,9 +998,10 @@ type getReceivesHistory_sub1 struct {
 	ReceiptDate string ``
 }
 
-/getSales
+GetSales
 Heavy
 Use this call to retrieve a list of sales from SkuVault. 10,000 sales are returned per page.
+sales
 package test
 
 type getSales struct {
@@ -1050,9 +1076,10 @@ type getSales_sub3 struct {
 
 type getSales_sub4 struct{}
 
-/getSalesByDate
+GetSalesByDate
 Heavy
 Returns sales based on a date range. 10,000 sales are returned per page.
+sales
 package test
 
 type getSalesByDate struct {
@@ -1150,9 +1177,10 @@ type getSalesByDate_sub3 struct {
 	UnitPrice  getSalesByDate_sub2 ``
 }
 
-/getShipments
+GetShipments
 Heavy
 Using this call, users can get current shipment information.
+app.skuvault.com/api
 package test
 
 type getShipments struct {
@@ -1265,9 +1293,10 @@ type getShipments_sub7 struct {
 
 type getShipments_sub3 struct{}
 
-/getSoldItems
+GetSoldItems
 Heavy
 Returns a list of sold items filtered by date. 10,000 sales are returned per page.
+sales
 package test
 
 type getSoldItems struct {
@@ -1291,9 +1320,10 @@ type getSoldItems_sub1 struct {
 	TotalPrice int64  ``
 }
 
-/getSuppliers
+GetSuppliers
 Heavy
 Returns the list of current Suppliers in a SkuVault account.
+products
 package test
 
 type getSuppliers struct {
@@ -1313,9 +1343,10 @@ type getSuppliers_sub1 struct {
 	Name      string ``
 }
 
-/getTokens
+GetTokens
 Very Light
 Use this call to retrieve your API tokens from SkuVault using your login email and password.
+app.skuvault.com/api
 package test
 
 type getTokens struct {
@@ -1330,9 +1361,10 @@ type getTokens struct {
 	UserToken   string ``
 }
 
-/getTransactions
+GetTransactions
 Heavy
 Look at your transaction history.
+inventory
 package test
 
 type getTransactions struct {
@@ -1376,9 +1408,10 @@ type getTransactions_sub1 struct {
 	Type string ``
 }
 
-/getWarehouseItemQuantities
+GetWarehouseItemQuantities
 Heavy
 This call returns SKUs and quantities from a specified warehouse. 10,000 SKUs returned per page.
+inventory
 package test
 
 type getWarehouseItemQuantities struct {
@@ -1400,9 +1433,10 @@ type getWarehouseItemQuantities_sub1 struct {
 	Sku      string ``
 }
 
-/getWarehouseItemQuantity
+GetWarehouseItemQuantity
 Heavy
 Returns the quantity for a specified SKU.
+inventory
 package test
 
 type getWarehouseItemQuantity struct {
@@ -1419,9 +1453,10 @@ type getWarehouseItemQuantity struct {
 	TotalQuantityOnHand int64    ``
 }
 
-/getWarehouses
+GetWarehouses
 Severe
 Returns all your regular warehouses.
+inventory
 package test
 
 type getWarehouses struct {
@@ -1441,9 +1476,10 @@ type getWarehouses_sub1 struct {
 	ID   string ``
 }
 
-/pickItem
+PickItem
 Moderate
 Perform a pick transaction through the API.
+inventory
 package test
 
 type pickItem struct {
@@ -1464,8 +1500,9 @@ type pickItem struct {
 	PickItemStatus string ``
 }
 
-/receivePOItems
+ReceivePOItems
 Moderate
+purchaseorders
 package test
 
 type receivePOItems struct {
@@ -1492,9 +1529,10 @@ type receivePOItems struct {
 	Status string   ``
 }
 
-/releaseHeldQuantities
+ReleaseHeldQuantities
 Moderate
 Release holds before their expiration date expires.
+sales
 package test
 
 type releaseHeldQuantities struct {
@@ -1517,9 +1555,10 @@ type releaseHeldQuantities_sub1 struct {
 	SKUAsKey int64 ``
 }
 
-/removeItem
+RemoveItem
 Moderate
 Remove quantity from a warehouse location. 
+inventory
 package test
 
 type removeItem struct {
@@ -1539,9 +1578,10 @@ type removeItem struct {
 	RemoveItemStatus string ``
 }
 
-/removeItemBulk
+RemoveItemBulk
 Moderate
 Remove quantity from warehouse locations, 100 at a time.
+inventory
 package test
 
 type removeItemBulk struct {
@@ -1567,9 +1607,10 @@ type removeItemBulk struct {
 	Status  string   ``
 }
 
-/setItemQuantities
+SetItemQuantities
 Moderate
 Sets quantity for multiple products in one request.
+inventory
 package test
 
 type setItemQuantities struct {
@@ -1613,9 +1654,10 @@ type setItemQuantities_sub1 struct {
 	Sku   string ``
 }
 
-/setItemQuantity
+SetItemQuantity
 Moderate
 This lets you explicitly set quantity for an item in a warehouse's location.
+inventory
 package test
 
 type setItemQuantity struct {
@@ -1634,9 +1676,10 @@ type setItemQuantity struct {
 	SetItemQuantityStatusEnum string ``
 }
 
-/setShipmentFile
+SetShipmentFile
 Severe
 Using this call, users can attach a base64 PDF file to Shipment Tracking Number.
+app.skuvault.com/api
 package test
 
 type setShipmentFile struct {
@@ -1662,9 +1705,10 @@ type setShipmentFile struct {
 
 type setShipmentFile_sub1 struct{}
 
-/syncOnlineSale
+SyncOnlineSale
 Moderate
 Sync an online sale to SkuVault. If the sale does not exists, it's created. If it does exist, it's updated.  ShippingStatus is required to create sale, but not update. ItemSkus is always required. Bulk version available: 
+sales
 package test
 
 type syncOnlineSale struct {
@@ -1713,9 +1757,10 @@ type syncOnlineSale struct {
 	Status  string ``
 }
 
-/syncOnlineSales
+SyncOnlineSales
 Severe
  Can make this call 2x per minute, 100 sales max
+sales
 package test
 
 type syncOnlineSales struct {
@@ -1785,9 +1830,10 @@ type syncOnlineSales_sub1 struct {
 	OrderID       string   ``
 }
 
-/syncShippedSaleAndRemoveItems
+SyncShippedSaleAndRemoveItems
 Moderate
 This method syncs a shipped sale and auto-removes quantity. It will auto-remove quantities based on the first match alphabetically in your warehouses & locations. If a warehouse is provided, then it will use that warehouse.
+sales
 package test
 
 type syncShippedSaleAndRemoveItems struct {
@@ -1831,9 +1877,10 @@ type syncShippedSaleAndRemoveItems struct {
 	RemoveItemErrors []string ``
 }
 
-/updateExternalWarehouseQuantities
+UpdateExternalWarehouseQuantities
 Severe
 Set the quantity of SKUs in a specified external warehouse. The limit is 100,000 SKUs per call.
+inventory
 package test
 
 type updateExternalWarehouseQuantities struct {
@@ -1859,9 +1906,10 @@ type updateExternalWarehouseQuantities struct {
 	Status string   ``
 }
 
-/updateHandlingTime
+UpdateHandlingTime
 Severe
 Update the handling time for each product per Amazon channel account, 500 at a time.
+products
 package test
 
 type updateHandlingTime struct {
@@ -1894,9 +1942,10 @@ type updateHandlingTime struct {
 	Status string        ``
 }
 
-/updateOnlineSaleStatus
+UpdateOnlineSaleStatus
 Light
 Update the status of a sale.
+sales
 package test
 
 type updateOnlineSaleStatus struct {
@@ -1917,9 +1966,10 @@ type updateOnlineSaleStatus struct {
 	Status string        ``
 }
 
-/updateProduct
+UpdateProduct
 Moderate
 Update your product details. Bulk version available: 
+products
 package test
 
 type updateProduct struct {
@@ -1969,9 +2019,10 @@ type updateProduct struct {
 	Status string        ``
 }
 
-/updateProducts
+UpdateProducts
 Heavy
 Update products in SkuVault, 100 at a time.
+products
 package test
 
 type updateProducts struct {
@@ -2032,9 +2083,10 @@ type updateProducts struct {
 	Status string   ``
 }
 
-/updateShipments
+UpdateShipments
 Severe
 Using this call, users can update shipments to a sale.
+sales
 package test
 
 type updateShipments struct {

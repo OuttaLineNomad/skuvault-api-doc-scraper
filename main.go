@@ -29,10 +29,6 @@ func main() {
 
 	doc := html.NewTokenizer(res.Body)
 	getEndPoints(doc)
-	// f, _ := os.Open("testing.json")
-
-	// b, _ := gojson.Generate(f, gojson.ParseJson, "Test", "test", nil, true)
-	// fmt.Println(string(b))
 }
 
 func getEndPoints(doc *html.Tokenizer) {
@@ -42,15 +38,15 @@ func getEndPoints(doc *html.Tokenizer) {
 
 		switch toks {
 		case html.ErrorToken:
-			// wg.Done()
 			return
 		case html.StartTagToken:
 			tok := doc.Token()
+
 			if tok.Data == "h2" {
 				toks = doc.Next()
 				full := doc.Token().Data
 				name = strings.Replace(full, "/", "", -1)
-				fmt.Println(full)
+				fmt.Println(strings.Title(name))
 				continue
 			}
 
@@ -81,6 +77,7 @@ func getEndPoints(doc *html.Tokenizer) {
 					}
 				}
 			}
+
 			if tok.Data == "span" {
 				jsons := ""
 				for _, att := range tok.Attr {
@@ -92,7 +89,6 @@ func getEndPoints(doc *html.Tokenizer) {
 							switch toks {
 							case html.TextToken:
 								if !rgx.MatchString(tok.Data) {
-
 									jsons += tok.Data
 								}
 							case html.EndTagToken:
@@ -116,7 +112,26 @@ func getEndPoints(doc *html.Tokenizer) {
 							}
 						}
 					}
+
+					if att.Val == "definition-url" {
+						var done bool
+					out3:
+						for {
+							toks = doc.Next()
+							tok = doc.Token()
+							switch {
+							case toks == html.TextToken:
+								url, _ := regexp.Compile(`app.skuvault.com/api/`)
+								fmt.Println(url.ReplaceAllString(tok.Data, ""))
+								done = true
+							case done:
+								break out3
+							}
+						}
+					}
+
 				}
+
 			}
 		}
 	}

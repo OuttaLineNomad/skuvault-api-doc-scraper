@@ -1,21 +1,12 @@
 {
-    "Transactions": [{
-        "User": "String",
-        "Sku": "String",
+    "Items": [{
         "Code": "String",
-        "ScannedCode": "String",
-        "Title": "String",
+        "LocationCode": "String",
         "Quantity": 0,
-        "QuantityBefore": 0,
-        "QuantityAfter": 0,
-        "Location": "String",
-        "TransactionType": "String",
-        "TransactionReason": "String",
-        "TransactionNote": "String",
-        "TransactionDate": "0001-01-01T00:00:00.0000000Z",
-        "Context": {
-            "Type": "Sale",
-            "ID": "1-1-1-1-SALE1"
-        }
-    }]
+        "Reason": "String",
+        "Sku": "String",
+        "WarehouseId": 0
+    }],
+    "TenantToken": "String",
+    "UserToken": "String"
 }
