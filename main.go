@@ -19,7 +19,7 @@ var (
 	propCh   chan string
 	info     chan string
 	throttle chan string
-	// structs  chan string
+	structs  chan string
 	files   chan string
 	allDone chan bool
 
@@ -44,7 +44,7 @@ func main() {
 	propCh = make(chan string)
 	info = make(chan string)
 	throttle = make(chan string)
-	// structs = make(chan string, 1)
+	structs = make(chan string, 1)
 	files = make(chan string)
 	allDone = make(chan bool, 1)
 
@@ -54,113 +54,122 @@ func main() {
 	}
 
 	doc := html.NewTokenizer(res.Body)
-	go func() {
-		inF, err := os.Create("inventroy.go")
-		if err != nil {
-			log.Panicln(err)
-		}
-		prF, err := os.Create("products.go")
-		if err != nil {
-			log.Panicln(err)
-		}
-		saF, err := os.Create("sales.go")
-		if err != nil {
-			log.Panicln(err)
-		}
-		poF, err := os.Create("purchaseorders.go")
-		if err != nil {
-			log.Panicln(err)
-		}
-		funcTemp := `
-		// {{.Proper}} creates http request for this SKU vault endpoint
-		// {{.Throttle}} Throttle
-		// {{.Info}}
-		func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
-			credPld := &post{{.Proper}} {
-				{{.Proper}}:       pld,
-				{{.File0}}LoginCredentials: lc,
-			}
-
-			response := &{{.File}}.{{.Proper}}Response{}
-			{{.File}}Call(credPld, response, {{.Name}})
-			return response
-		}`
-
-		inTemp, err := template.New("inventory").Parse(funcTemp)
-		if err != nil {
-			log.Panicln(err)
-		}
-		proTemp, err := template.New("products").Parse(funcTemp)
-		if err != nil {
-			log.Panicln(err)
-		}
-		salTemp, err := template.New("sales").Parse(funcTemp)
-		if err != nil {
-			log.Panicln(err)
-		}
-		poTemp, err := template.New("purchaseorders").Parse(funcTemp)
-		if err != nil {
-			log.Panicln(err)
-		}
-
-		inF.WriteString("package inventory")
-		prF.WriteString("package products")
-		saF.WriteString("package sales")
-		poF.WriteString("package purchaseorders")
-
-		for {
-			println("start")
-			propStr := <-propCh
-			println("propStr")
-			nameStr := <-nameCh
-			println("nameStr")
-			throttleStr := <-throttle
-			println("throttleStr")
-			infoStr := <-info
-
-			println("infoStr:::", infoStr)
-			filesStr := <-files
-			println("filesStr")
-			// <-structs
-
-			tags := templateTags{
-				Proper:   propStr,
-				Throttle: throttleStr,
-				Name:     nameStr,
-				Info:     infoStr,
-				File:     filesStr,
-				File0:    strings.ToUpper(string(filesStr[0])),
-			}
-			switch filesStr {
-			case "inventory":
-				err = inTemp.Execute(inF, tags)
-				if err != nil {
-					log.Panicln(err)
-				}
-			case "products":
-				err = proTemp.Execute(prF, tags)
-				if err != nil {
-					log.Panicln(err)
-				}
-			case "sales":
-				err = salTemp.Execute(saF, tags)
-				if err != nil {
-					log.Panicln(err)
-				}
-			case "purchaseorders":
-				tags.File0 = "PO"
-				err = poTemp.Execute(poF, tags)
-				if err != nil {
-					log.Panicln(err)
-				}
-
-			}
-		}
-	}()
+	go makeFuncs()
+	go makeStruct()
 
 	getEndPoints(doc)
 	<-allDone
 }
+
+func makeStruct(){
+
+}
+
+
+
+
+func makeFuncs(){
+	inF, err := os.Create("skuvault/inventroy.go")
+	if err != nil {
+		log.Panicln(err)
+	}
+	prF, err := os.Create("skuvault/products.go")
+	if err != nil {
+		log.Panicln(err)
+	}
+	saF, err := os.Create("skuvault/sales.go")
+	if err != nil {
+		log.Panicln(err)
+	}
+	poF, err := os.Create("skuvault/purchaseorders.go")
+	if err != nil {
+		log.Panicln(err)
+	}
+	funcTemp := `
+	// {{.Proper}} creates http request for this SKU vault endpoint
+	// {{.Throttle}} Throttle
+	// {{.Info}}
+	func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
+		credPld := &post{{.Proper}} {
+			{{.Proper}}:       pld,
+			{{.File0}}LoginCredentials: lc,
+		}
+
+		response := &{{.File}}.{{.Proper}}Response{}
+		{{.File}}Call(credPld, response, {{.Name}})
+		return response
+	}`
+
+	inTemp, err := template.New("inventory").Parse(funcTemp)
+	if err != nil {
+		log.Panicln(err)
+	}
+	proTemp, err := template.New("products").Parse(funcTemp)
+	if err != nil {
+		log.Panicln(err)
+	}
+	salTemp, err := template.New("sales").Parse(funcTemp)
+	if err != nil {
+		log.Panicln(err)
+	}
+	poTemp, err := template.New("purchaseorders").Parse(funcTemp)
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	inF.WriteString("package skuvault")
+	prF.WriteString("package skuvault")
+	saF.WriteString("package skuvault")
+	poF.WriteString("package skuvault")
+
+	for {
+		println("start")
+		propStr := <-propCh
+		println("propStr")
+		nameStr := <-nameCh
+		println("nameStr")
+		throttleStr := <-throttle
+		println("throttleStr")
+		infoStr := <-info
+		println("infoStr:::", infoStr)
+		filesStr := <-files
+		println("filesStr")
+	
+		tags := templateTags{
+			Proper:   propStr,
+			Throttle: throttleStr,
+			Name:     nameStr,
+			Info:     infoStr,
+			File:     filesStr,
+			File0:    strings.ToUpper(string(filesStr[0])),
+		}
+		switch filesStr {
+		case "inventory":
+			err = inTemp.Execute(inF, tags)
+			if err != nil {
+				log.Panicln(err)
+			}
+		case "products":
+			err = proTemp.Execute(prF, tags)
+			if err != nil {
+				log.Panicln(err)
+			}
+		case "sales":
+			err = salTemp.Execute(saF, tags)
+			if err != nil {
+				log.Panicln(err)
+			}
+		case "purchaseorders":
+			tags.File0 = "PO"
+			err = poTemp.Execute(poF, tags)
+			if err != nil {
+				log.Panicln(err)
+			}
+
+		}
+	}
+}
+
 
 func getEndPoints(doc *html.Tokenizer) {
 	name := ""
@@ -261,7 +270,7 @@ func getEndPoints(doc *html.Tokenizer) {
 										println(f2)
 										log.Panicln(err)
 									}
-									fmt.Println(string(b))
+									structs<-string(b)
 									println("^^^^^^^^^^")
 									println("||||||||||")
 									println("||||||||||")
