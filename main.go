@@ -8,7 +8,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/ChimeraCoder/gojson"
 
@@ -20,11 +19,12 @@ var (
 	propCh   chan string
 	info     chan string
 	throttle chan string
-	structs  chan string
-	files    chan string
-	allDone  chan bool
+	// structs  chan string
+	files   chan string
+	allDone chan bool
 
-	wg     sync.WaitGroup
+	infoDone bool
+
 	rgx, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
 	th2, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?`)
 	nl, _  = regexp.Compile(`\n`)
@@ -44,9 +44,9 @@ func main() {
 	propCh = make(chan string)
 	info = make(chan string)
 	throttle = make(chan string)
-	// structs = make(chan string, 2)
+	// structs = make(chan string, 1)
 	files = make(chan string)
-	allDone = make(chan bool)
+	allDone = make(chan bool, 1)
 
 	res, err := http.Get("https://dev.skuvault.com/reference")
 	if err != nil {
@@ -54,41 +54,28 @@ func main() {
 	}
 
 	doc := html.NewTokenizer(res.Body)
-	wg.Add(1)
 	go func() {
-		for {
-			select {
-			case <-allDone:
-				wg.Done()
-				return
-			default:
-				println("start")
-				propStr := <-propCh
-				println("propStr")
-				nameStr := <-nameCh
-				println("nameStr")
-				throttleStr := <-throttle
-				println("throttleStr")
-				infoStr := <-info
-				println("infoStr")
-				filesStr := <-files
-				println("filesStr")
-				// structsStr := <-structs
-
-				tags := templateTags{
-					Proper:   propStr,
-					Throttle: throttleStr,
-					Name:     nameStr,
-					Info:     infoStr,
-					File:     filesStr,
-					File0:    string(filesStr[0]),
-				}
-
-				funcTemp := `
+		inF, err := os.Create("inventroy.go")
+		if err != nil {
+			log.Panicln(err)
+		}
+		prF, err := os.Create("products.go")
+		if err != nil {
+			log.Panicln(err)
+		}
+		saF, err := os.Create("sales.go")
+		if err != nil {
+			log.Panicln(err)
+		}
+		poF, err := os.Create("purchaseorders.go")
+		if err != nil {
+			log.Panicln(err)
+		}
+		funcTemp := `
 		// {{.Proper}} creates http request for this SKU vault endpoint
 		// {{.Throttle}} Throttle
 		// {{.Info}}
-		func (lc *PLoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
+		func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
 			credPld := &post{{.Proper}} {
 				{{.Proper}}:       pld,
 				{{.File0}}LoginCredentials: lc,
@@ -99,24 +86,80 @@ func main() {
 			return response
 		}`
 
-				f, err := os.Create("test.go")
+		inTemp, err := template.New("inventory").Parse(funcTemp)
+		if err != nil {
+			log.Panicln(err)
+		}
+		proTemp, err := template.New("products").Parse(funcTemp)
+		if err != nil {
+			log.Panicln(err)
+		}
+		salTemp, err := template.New("sales").Parse(funcTemp)
+		if err != nil {
+			log.Panicln(err)
+		}
+		poTemp, err := template.New("purchaseorders").Parse(funcTemp)
+		if err != nil {
+			log.Panicln(err)
+		}
+
+		inF.WriteString("package inventory")
+		prF.WriteString("package products")
+		saF.WriteString("package sales")
+		poF.WriteString("package purchaseorders")
+
+		for {
+			println("start")
+			propStr := <-propCh
+			println("propStr")
+			nameStr := <-nameCh
+			println("nameStr")
+			throttleStr := <-throttle
+			println("throttleStr")
+			infoStr := <-info
+
+			println("infoStr:::", infoStr)
+			filesStr := <-files
+			println("filesStr")
+			// <-structs
+
+			tags := templateTags{
+				Proper:   propStr,
+				Throttle: throttleStr,
+				Name:     nameStr,
+				Info:     infoStr,
+				File:     filesStr,
+				File0:    strings.ToUpper(string(filesStr[0])),
+			}
+			switch filesStr {
+			case "inventory":
+				err = inTemp.Execute(inF, tags)
 				if err != nil {
 					log.Panicln(err)
 				}
-				tmp, err := template.New("test").Parse(funcTemp)
+			case "products":
+				err = proTemp.Execute(prF, tags)
 				if err != nil {
 					log.Panicln(err)
 				}
-				err = tmp.Execute(f, tags)
+			case "sales":
+				err = salTemp.Execute(saF, tags)
 				if err != nil {
 					log.Panicln(err)
 				}
+			case "purchaseorders":
+				tags.File0 = "PO"
+				err = poTemp.Execute(poF, tags)
+				if err != nil {
+					log.Panicln(err)
+				}
+
 			}
 		}
 	}()
 
 	getEndPoints(doc)
-	wg.Wait()
+	<-allDone
 }
 
 func getEndPoints(doc *html.Tokenizer) {
@@ -127,6 +170,7 @@ func getEndPoints(doc *html.Tokenizer) {
 
 		switch toks {
 		case html.ErrorToken:
+			println("done")
 			allDone <- true
 			return
 		case html.StartTagToken:
@@ -164,16 +208,17 @@ func getEndPoints(doc *html.Tokenizer) {
 								if !rgx.MatchString(tok.Data) {
 									count++
 									first := th2.ReplaceAllString(tok.Data, "")
-									fmt.Println(first)
 									println(count)
 									if count == 1 {
+										infoDone = false
 										println("throttle")
 										throttle <- first
 										println("throttle?")
 										continue
 									}
-									println(first)
+									println("Info")
 									info <- first
+									infoDone = true
 									println("info?")
 
 								}
@@ -217,6 +262,12 @@ func getEndPoints(doc *html.Tokenizer) {
 										log.Panicln(err)
 									}
 									fmt.Println(string(b))
+									println("^^^^^^^^^^")
+									println("||||||||||")
+									println("||||||||||")
+									println("||||||||||")
+									println("||||||||||")
+									println("|________|")
 									break out2
 								}
 							}
@@ -240,8 +291,11 @@ func getEndPoints(doc *html.Tokenizer) {
 									otherURL := strings.Split(tok.Data, "/")
 									file = otherURL[0]
 								}
-								fmt.Println(file)
-
+								println(file)
+								if !infoDone {
+									println(":lasdfa")
+									info <- "NONE"
+								}
 								println("test2")
 								files <- file
 								println("test2?")
