@@ -15,15 +15,16 @@ import (
 )
 
 var (
-	nameCh   chan string
-	propCh   chan string
-	info     chan string
-	throttle chan string
-	structs  chan string
-	files   chan string
-	allDone chan bool
+	nameCh     chan string
+	propCh     chan string
+	info       chan string
+	throttle   chan string
+	apiStructs chan apiStructsData
+	files      chan string
+	allDone    chan bool
 
 	infoDone bool
+	apiCount int
 
 	rgx, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
 	th2, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?`)
@@ -38,13 +39,28 @@ type templateTags struct {
 	File     string
 	File0    string
 }
+type apiStructsData struct {
+	Name   string
+	File   string
+	Spot   int
+	Struct string
+}
+
+func init() {
+	os.Mkdir(`skuvault`, os.ModePerm)
+	os.Mkdir(`skuvault/inventory`, os.ModePerm)
+	os.Mkdir(`skuvault/products`, os.ModePerm)
+	os.Mkdir(`skuvault/sales`, os.ModePerm)
+	os.Mkdir(`skuvault/purchaseorders`, os.ModePerm)
+	os.Mkdir(`skuvault/integration`, os.ModePerm)
+}
 
 func main() {
 	nameCh = make(chan string)
 	propCh = make(chan string)
 	info = make(chan string)
 	throttle = make(chan string)
-	structs = make(chan string, 1)
+	apiStructs = make(chan apiStructsData, 2)
 	files = make(chan string)
 	allDone = make(chan bool, 1)
 
@@ -55,21 +71,38 @@ func main() {
 
 	doc := html.NewTokenizer(res.Body)
 	go makeFuncs()
-	go makeStruct()
+	go makeStructs()
 
 	getEndPoints(doc)
 	<-allDone
 }
 
-func makeStruct(){
+func makeStructs() {
+	for {
+		apiStr := <-apiStructs
+		f, err := os.Create("skuvault/" + apiStr.File + "/" + apiStr.Name + ".go")
+		if err != nil {
+			log.Panicln(err)
+		}
+
+		pakName, err := regexp.Compile(`package (inventory|products|sales|purchaseorders|integration)`)
+		if err != nil {
+			log.Panicln(err)
+		}
+
+		structStr := pakName.ReplaceAllString(apiStr.Struct, "")
+		if apiStr.Spot == 1 {
+			f.WriteString(`package ` + apiStr.File + `\n`)
+		}
+		f.WriteString(structStr)
+		f.Close()
+
+	}
 
 }
 
-
-
-
-func makeFuncs(){
-	inF, err := os.Create("skuvault/inventroy.go")
+func makeFuncs() {
+	inF, err := os.Create("skuvault/inventory.go")
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -134,7 +167,7 @@ func makeFuncs(){
 		println("infoStr:::", infoStr)
 		filesStr := <-files
 		println("filesStr")
-	
+
 		tags := templateTags{
 			Proper:   propStr,
 			Throttle: throttleStr,
@@ -170,7 +203,6 @@ func makeFuncs(){
 	}
 }
 
-
 func getEndPoints(doc *html.Tokenizer) {
 	name := ""
 	file := ""
@@ -191,6 +223,7 @@ func getEndPoints(doc *html.Tokenizer) {
 				proper := strings.Title(name)
 
 				if proper != "Developing For SkuVault" {
+					apiCount = 0
 					propCh <- proper
 					fmt.Println(proper)
 					println("AFTER")
@@ -246,6 +279,7 @@ func getEndPoints(doc *html.Tokenizer) {
 				jsons := ""
 				for _, att := range tok.Attr {
 					if att.Val == "cm-s-tomorrow-night" {
+						apiCount := 0
 					out2:
 						for {
 							toks = doc.Next()
@@ -270,7 +304,14 @@ func getEndPoints(doc *html.Tokenizer) {
 										println(f2)
 										log.Panicln(err)
 									}
-									structs<-string(b)
+									apiCount++
+									apiStructs <- apiStructsData{
+										Spot:   apiCount,
+										Struct: string(b),
+										File:   file,
+										Name:   name,
+									}
+
 									println("^^^^^^^^^^")
 									println("||||||||||")
 									println("||||||||||")
@@ -295,14 +336,18 @@ func getEndPoints(doc *html.Tokenizer) {
 								url, _ := regexp.Compile(`app.skuvault.com/api/`)
 								file = url.ReplaceAllString(tok.Data, "")
 								if file == "app.skuvault.com/api" {
-									toks = doc.Next()
-									tok = doc.Token()
-									otherURL := strings.Split(tok.Data, "/")
-									file = otherURL[0]
+									for {
+										toks = doc.Next()
+										tok = doc.Token()
+										switch toks {
+										case html.TextToken:
+											otherURL := strings.Split(tok.Data, "/")
+											file = otherURL[0]
+										}
+									}
 								}
 								println(file)
 								if !infoDone {
-									println(":lasdfa")
 									info <- "NONE"
 								}
 								println("test2")
