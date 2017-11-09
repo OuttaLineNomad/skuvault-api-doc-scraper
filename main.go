@@ -19,16 +19,16 @@ var (
 	propCh     chan string
 	info       chan string
 	throttle   chan string
-	apiStructs chan apiStructsData
+	apiStructs chan []apiStructsData
 	files      chan string
 	allDone    chan bool
 
 	infoDone bool
-	apiCount int
 
-	rgx, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
-	th2, _ = regexp.Compile(`\s?[tT]hrottling[.:]?\s?`)
-	nl, _  = regexp.Compile(`\n`)
+	rgx, _      = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
+	th2, _      = regexp.Compile(`\s?[tT]hrottling[.:]?\s?`)
+	nl, _       = regexp.Compile(`\n`)
+	fileName, _ = regexp.Compile(`(inventory|products|sales|purchaseorders|integration)`)
 )
 
 type templateTags struct {
@@ -60,9 +60,9 @@ func main() {
 	propCh = make(chan string)
 	info = make(chan string)
 	throttle = make(chan string)
-	apiStructs = make(chan apiStructsData, 2)
+	apiStructs = make(chan []apiStructsData)
 	files = make(chan string)
-	allDone = make(chan bool, 1)
+	allDone = make(chan bool)
 
 	res, err := http.Get("https://dev.skuvault.com/reference")
 	if err != nil {
@@ -80,23 +80,34 @@ func main() {
 func makeStructs() {
 	for {
 		apiStr := <-apiStructs
-		f, err := os.Create("skuvault/" + apiStr.File + "/" + apiStr.Name + ".go")
-		if err != nil {
-			log.Panicln(err)
-		}
+		var f *os.File
+		var err error
+		structStr := ""
+		if apiStr[0].File != "skuvault" {
+			f, err = os.Create("skuvault/" + apiStr[0].File + "/" + apiStr[0].Name + ".go")
 
-		pakName, err := regexp.Compile(`package (inventory|products|sales|purchaseorders|integration)`)
-		if err != nil {
-			log.Panicln(err)
+			if err != nil {
+				log.Panicln(err)
+			}
+		} else {
+			f, err = os.Create("skuvault/" + apiStr[0].Name + ".go")
+			if err != nil {
+				log.Panicln(err)
+			}
 		}
+		for _, stru := range apiStr {
+			pakName, err := regexp.Compile(`package (inventory|products|sales|purchaseorders|integration|skuvault)`)
+			if err != nil {
+				log.Panicln(err)
+			}
 
-		structStr := pakName.ReplaceAllString(apiStr.Struct, "")
-		if apiStr.Spot == 1 {
-			f.WriteString(`package ` + apiStr.File + `\n`)
+			cleand := pakName.ReplaceAllString(stru.Struct, "")
+			structStr += cleand
+
 		}
+		f.WriteString(`package ` + apiStr[0].File)
 		f.WriteString(structStr)
 		f.Close()
-
 	}
 
 }
@@ -115,6 +126,10 @@ func makeFuncs() {
 		log.Panicln(err)
 	}
 	poF, err := os.Create("skuvault/purchaseorders.go")
+	if err != nil {
+		log.Panicln(err)
+	}
+	noF, err := os.Create("skuvault/nocategory.go")
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -149,11 +164,16 @@ func makeFuncs() {
 	if err != nil {
 		log.Panicln(err)
 	}
+	noTemp, err := template.New("noTemp").Parse(funcTemp)
+	if err != nil {
+		log.Panicln(err)
+	}
 
 	inF.WriteString("package skuvault")
 	prF.WriteString("package skuvault")
 	saF.WriteString("package skuvault")
 	poF.WriteString("package skuvault")
+	noF.WriteString("package skuvault")
 
 	for {
 		println("start")
@@ -168,13 +188,18 @@ func makeFuncs() {
 		filesStr := <-files
 		println("filesStr")
 
+		file0 := ""
+		if filesStr != "" {
+			file0 = strings.ToUpper(string(filesStr[0]))
+		}
+
 		tags := templateTags{
 			Proper:   propStr,
 			Throttle: throttleStr,
 			Name:     nameStr,
 			Info:     infoStr,
 			File:     filesStr,
-			File0:    strings.ToUpper(string(filesStr[0])),
+			File0:    file0,
 		}
 		switch filesStr {
 		case "inventory":
@@ -198,6 +223,12 @@ func makeFuncs() {
 			if err != nil {
 				log.Panicln(err)
 			}
+		default:
+			tags.File0 = ""
+			err = noTemp.Execute(noF, tags)
+			if err != nil {
+				log.Panicln(err)
+			}
 
 		}
 	}
@@ -206,6 +237,8 @@ func makeFuncs() {
 func getEndPoints(doc *html.Tokenizer) {
 	name := ""
 	file := ""
+	bothStructs := []apiStructsData{}
+	apiCount := 0
 	for {
 		toks := doc.Next()
 
@@ -223,7 +256,6 @@ func getEndPoints(doc *html.Tokenizer) {
 				proper := strings.Title(name)
 
 				if proper != "Developing For SkuVault" {
-					apiCount = 0
 					propCh <- proper
 					fmt.Println(proper)
 					println("AFTER")
@@ -279,7 +311,6 @@ func getEndPoints(doc *html.Tokenizer) {
 				jsons := ""
 				for _, att := range tok.Attr {
 					if att.Val == "cm-s-tomorrow-night" {
-						apiCount := 0
 					out2:
 						for {
 							toks = doc.Next()
@@ -299,17 +330,36 @@ func getEndPoints(doc *html.Tokenizer) {
 										f2 = ok2.ReplaceAllString(f1, `}}]`)
 									}
 									jRead := strings.NewReader(f2)
-									b, err := gojson.Generate(jRead, gojson.ParseJson, name, file, nil, true)
+									change := false
+									if file == "" {
+										file = "skuvault"
+										change = true
+									}
+									StruName := name
+									if apiCount == 1 {
+										StruName += "Response"
+									}
+									b, err := gojson.Generate(jRead, gojson.ParseJson, StruName, file, nil, true)
 									if err != nil {
 										println(f2)
 										log.Panicln(err)
 									}
 									apiCount++
-									apiStructs <- apiStructsData{
+									println("API COUNT>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", apiCount)
+									st := apiStructsData{
 										Spot:   apiCount,
 										Struct: string(b),
 										File:   file,
 										Name:   name,
+									}
+									bothStructs = append(bothStructs, st)
+									if apiCount == 2 {
+										apiStructs <- bothStructs
+										bothStructs = []apiStructsData{}
+										apiCount = 0
+									}
+									if change {
+										file = ""
 									}
 
 									println("^^^^^^^^^^")
@@ -325,7 +375,6 @@ func getEndPoints(doc *html.Tokenizer) {
 					}
 
 					if att.Val == "definition-url" {
-						// println("test2")
 						var done bool
 					out3:
 						for {
@@ -336,13 +385,21 @@ func getEndPoints(doc *html.Tokenizer) {
 								url, _ := regexp.Compile(`app.skuvault.com/api/`)
 								file = url.ReplaceAllString(tok.Data, "")
 								if file == "app.skuvault.com/api" {
+								urlSpan:
 									for {
 										toks = doc.Next()
 										tok = doc.Token()
-										switch toks {
-										case html.TextToken:
+										switch {
+										case toks == html.TextToken:
+											if len(tok.Data) == 0 {
+												continue urlSpan
+											}
 											otherURL := strings.Split(tok.Data, "/")
-											file = otherURL[0]
+											file = otherURL[1]
+											if !fileName.MatchString(file) {
+												file = ""
+											}
+											break urlSpan
 										}
 									}
 								}
