@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/ChimeraCoder/gojson"
@@ -232,6 +233,19 @@ func makeFuncs() {
 
 		}
 	}
+}
+
+func structRename(data string) {
+	liens := strings.Split(data, "\n")
+	for i, line := range liens {
+		sub := regexp.MustCompile(`^\s[^\s]+\s+[^\s]+_[^\s]+` + strconv.Itoa(i+1) + `$`)
+		if !sub.MatchString(line) {
+			continue
+		}
+		splits := sub.
+
+	}
+
 }
 
 func getEndPoints(doc *html.Tokenizer) {
