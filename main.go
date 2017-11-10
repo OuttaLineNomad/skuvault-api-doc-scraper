@@ -1,18 +1,21 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/ChimeraCoder/gojson"
 
 	"golang.org/x/net/html"
+)
+
+const (
+	folder = "../skuvault"
 )
 
 var (
@@ -22,7 +25,6 @@ var (
 	throttle   chan string
 	apiStructs chan []apiStructsData
 	files      chan string
-	allDone    chan bool
 
 	infoDone bool
 
@@ -48,12 +50,13 @@ type apiStructsData struct {
 }
 
 func init() {
-	os.Mkdir(`skuvault`, os.ModePerm)
-	os.Mkdir(`skuvault/inventory`, os.ModePerm)
-	os.Mkdir(`skuvault/products`, os.ModePerm)
-	os.Mkdir(`skuvault/sales`, os.ModePerm)
-	os.Mkdir(`skuvault/purchaseorders`, os.ModePerm)
-	os.Mkdir(`skuvault/integration`, os.ModePerm)
+	os.Mkdir(folder, os.ModePerm)
+	os.Mkdir(folder+"/inventory", os.ModePerm)
+	os.Mkdir(folder+"/products", os.ModePerm)
+	os.Mkdir(folder+"/sales", os.ModePerm)
+	os.Mkdir(folder+"/purchaseorders", os.ModePerm)
+	os.Mkdir(folder+"/integration", os.ModePerm)
+
 }
 
 func main() {
@@ -63,8 +66,8 @@ func main() {
 	throttle = make(chan string)
 	apiStructs = make(chan []apiStructsData)
 	files = make(chan string)
-	allDone = make(chan bool)
 
+	println("get api docs")
 	res, err := http.Get("https://dev.skuvault.com/reference")
 	if err != nil {
 		log.Panicln(err)
@@ -73,9 +76,15 @@ func main() {
 	doc := html.NewTokenizer(res.Body)
 	go makeFuncs()
 	go makeStructs()
-
+	println("starting getEndPoints")
 	getEndPoints(doc)
-	<-allDone
+	println("go fmt...")
+	exec.Command("go", "fmt", folder).Run()
+	exec.Command("go", "fmt", folder+"/integration/").Run()
+	exec.Command("go", "fmt", folder+"/inventory/").Run()
+	exec.Command("go", "fmt", folder+"/products/").Run()
+	exec.Command("go", "fmt", folder+"/purchaseorders/").Run()
+	exec.Command("go", "fmt", folder+"/sales/").Run()
 }
 
 func makeStructs() {
@@ -85,13 +94,13 @@ func makeStructs() {
 		var err error
 		structStr := ""
 		if apiStr[0].File != "skuvault" {
-			f, err = os.Create("skuvault/" + apiStr[0].File + "/" + apiStr[0].Name + ".go")
+			f, err = os.Create(folder + "/" + apiStr[0].File + "/" + apiStr[0].Name + ".go")
 
 			if err != nil {
 				log.Panicln(err)
 			}
 		} else {
-			f, err = os.Create("skuvault/" + apiStr[0].Name + ".go")
+			f, err = os.Create(folder + "/" + apiStr[0].Name + ".go")
 			if err != nil {
 				log.Panicln(err)
 			}
@@ -107,37 +116,48 @@ func makeStructs() {
 
 		}
 		f.WriteString(`package ` + apiStr[0].File)
-		f.WriteString(structStr)
+		fileStr := structRename(structStr)
+		f.WriteString(fileStr)
 		f.Close()
 	}
 
 }
 
 func makeFuncs() {
-	inF, err := os.Create("skuvault/inventory.go")
+	inF, err := os.Create(folder + "/inventory.go")
 	if err != nil {
 		log.Panicln(err)
 	}
-	prF, err := os.Create("skuvault/products.go")
+	prF, err := os.Create(folder + "/products.go")
 	if err != nil {
 		log.Panicln(err)
 	}
-	saF, err := os.Create("skuvault/sales.go")
+	saF, err := os.Create(folder + "/sales.go")
 	if err != nil {
 		log.Panicln(err)
 	}
-	poF, err := os.Create("skuvault/purchaseorders.go")
+	poF, err := os.Create(folder + "/purchaseorders.go")
 	if err != nil {
 		log.Panicln(err)
 	}
-	noF, err := os.Create("skuvault/nocategory.go")
+	intF, err := os.Create(folder + "/integration.go")
+	if err != nil {
+		log.Panicln(err)
+	}
+	noF, err := os.Create(folder + "/nocategory.go")
 	if err != nil {
 		log.Panicln(err)
 	}
 	funcTemp := `
-	// {{.Proper}} creates http request for this SKU vault endpoint
-	// {{.Throttle}} Throttle
-	// {{.Info}}
+	// post{{.Proper}} payload sent to Sku Vault.
+	type post{{.Proper}} struct {
+		*{{.File}}.{{.Proper}}
+		*{{.File0}}LoginCredentials
+	}
+
+	// {{.Proper}} creates http request for this SKU vault endpoint.
+	// {{.Throttle}} Throttle.
+	// {{.Info}}.
 	func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
 		credPld := &post{{.Proper}} {
 			{{.Proper}}:       pld,
@@ -165,7 +185,11 @@ func makeFuncs() {
 	if err != nil {
 		log.Panicln(err)
 	}
-	noTemp, err := template.New("noTemp").Parse(funcTemp)
+	intTemp, err := template.New("integration").Parse(funcTemp)
+	if err != nil {
+		log.Panicln(err)
+	}
+	noTemp, err := template.New("noTemp").Parse(strings.Replace(funcTemp, "{{.File}}.", "", -1))
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -175,9 +199,9 @@ func makeFuncs() {
 	saF.WriteString("package skuvault")
 	poF.WriteString("package skuvault")
 	noF.WriteString("package skuvault")
+	intF.WriteString("package skuvault")
 
 	for {
-		println("start")
 		propStr := <-propCh
 		println("propStr")
 		nameStr := <-nameCh
@@ -185,7 +209,7 @@ func makeFuncs() {
 		throttleStr := <-throttle
 		println("throttleStr")
 		infoStr := <-info
-		println("infoStr:::", infoStr)
+		println("infoStr")
 		filesStr := <-files
 		println("filesStr")
 
@@ -224,6 +248,12 @@ func makeFuncs() {
 			if err != nil {
 				log.Panicln(err)
 			}
+		case "integration":
+			tags.File0 = "IN"
+			err = intTemp.Execute(intF, tags)
+			if err != nil {
+				log.Panicln(err)
+			}
 		default:
 			tags.File0 = ""
 			err = noTemp.Execute(noF, tags)
@@ -235,17 +265,18 @@ func makeFuncs() {
 	}
 }
 
-func structRename(data string) {
-	liens := strings.Split(data, "\n")
-	for i, line := range liens {
-		sub := regexp.MustCompile(`^\s[^\s]+\s+[^\s]+_[^\s]+` + strconv.Itoa(i+1) + `$`)
+func structRename(data string) string {
+	lines := strings.Split(data, "\n")
+	newData := data
+	for _, line := range lines {
+		sub := regexp.MustCompile(`^\s+(?P<key>[^\s]+)\s+[\[\]]*(?P<val>[^\s]+_sub[1-9][0-9]*)`)
 		if !sub.MatchString(line) {
 			continue
 		}
-		splits := sub.
-
+		key := sub.FindStringSubmatch(line)
+		newData = strings.Replace(newData, key[2], key[1], -1)
 	}
-
+	return newData
 }
 
 func getEndPoints(doc *html.Tokenizer) {
@@ -259,7 +290,6 @@ func getEndPoints(doc *html.Tokenizer) {
 		switch toks {
 		case html.ErrorToken:
 			println("done")
-			allDone <- true
 			return
 		case html.StartTagToken:
 			tok := doc.Token()
@@ -270,11 +300,9 @@ func getEndPoints(doc *html.Tokenizer) {
 				proper := strings.Title(name)
 
 				if proper != "Developing For SkuVault" {
+					println("Nameing")
 					propCh <- proper
-					fmt.Println(proper)
-					println("AFTER")
 					nameCh <- name
-					println("AFTER?")
 				}
 
 				continue
@@ -296,18 +324,14 @@ func getEndPoints(doc *html.Tokenizer) {
 								if !rgx.MatchString(tok.Data) {
 									count++
 									first := th2.ReplaceAllString(tok.Data, "")
-									println(count)
 									if count == 1 {
 										infoDone = false
-										println("throttle")
+										println("Throttle")
 										throttle <- first
-										println("throttle?")
 										continue
 									}
-									println("Info")
 									info <- first
 									infoDone = true
-									println("info?")
 
 								}
 							case html.EndTagToken:
@@ -355,11 +379,9 @@ func getEndPoints(doc *html.Tokenizer) {
 									}
 									b, err := gojson.Generate(jRead, gojson.ParseJson, StruName, file, nil, true)
 									if err != nil {
-										println(f2)
 										log.Panicln(err)
 									}
 									apiCount++
-									println("API COUNT>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", apiCount)
 									st := apiStructsData{
 										Spot:   apiCount,
 										Struct: string(b),
@@ -368,6 +390,7 @@ func getEndPoints(doc *html.Tokenizer) {
 									}
 									bothStructs = append(bothStructs, st)
 									if apiCount == 2 {
+										println("adding structs")
 										apiStructs <- bothStructs
 										bothStructs = []apiStructsData{}
 										apiCount = 0
@@ -376,12 +399,6 @@ func getEndPoints(doc *html.Tokenizer) {
 										file = ""
 									}
 
-									println("^^^^^^^^^^")
-									println("||||||||||")
-									println("||||||||||")
-									println("||||||||||")
-									println("||||||||||")
-									println("|________|")
 									break out2
 								}
 							}
@@ -417,13 +434,11 @@ func getEndPoints(doc *html.Tokenizer) {
 										}
 									}
 								}
-								println(file)
 								if !infoDone {
 									info <- "NONE"
 								}
-								println("test2")
+								println("get files")
 								files <- file
-								println("test2?")
 								done = true
 							case done:
 								break out3
