@@ -1,5 +1,11 @@
 package main
 
+/*
+*
+* Have to collect template data for SV main, and figue out goimports.
+*
+ */
+
 import (
 	"html/template"
 	"log"
@@ -10,7 +16,7 @@ import (
 	"strings"
 
 	"github.com/ChimeraCoder/gojson"
-
+	"github.com/OuttaLineNomad/skuvault-api-doc-scraper/templates"
 	"golang.org/x/net/html"
 )
 
@@ -33,6 +39,17 @@ var (
 	nl, _       = regexp.Compile(`\n`)
 	fileName, _ = regexp.Compile(`(inventory|products|sales|purchaseorders|integration)`)
 )
+
+type creds struct {
+	Name string
+	Cred string
+}
+
+type svgTemplateTags struct {
+	Company  string
+	URL      string
+	CtrBunch []creds
+}
 
 type templateTags struct {
 	Proper   string
@@ -85,6 +102,44 @@ func main() {
 	exec.Command("go", "fmt", folder+"/products/").Run()
 	exec.Command("go", "fmt", folder+"/purchaseorders/").Run()
 	exec.Command("go", "fmt", folder+"/sales/").Run()
+	println("goimports...")
+	addImports()
+}
+
+func addImports() {
+	cmd := exec.Command("goimports", folder+"/skuvault.go")
+	src, err := os.Open(folder + "/skuvault.go")
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	b, err := cmd.Output()
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	src.Write(b)
+	src.Close()
+}
+
+func makeSVControl(company, url string, crd []creds) {
+	svg, err := os.Create(folder + "/skuvault.go")
+	if err != nil {
+		log.Panicln(err)
+	}
+	svgTemp, err := template.New("mainsvg").Parse(templates.SVMain)
+	if err != nil {
+		log.Panicln(err)
+	}
+	tags := svgTemplateTags{
+		Company:  company,
+		URL:      url,
+		CtrBunch: crd,
+	}
+	err = svgTemp.Execute(svg, tags)
+	if err != nil {
+		log.Panicln(err)
+	}
 }
 
 func makeStructs() {
@@ -148,26 +203,7 @@ func makeFuncs() {
 	if err != nil {
 		log.Panicln(err)
 	}
-	funcTemp := `
-	// post{{.Proper}} payload sent to Sku Vault.
-	type post{{.Proper}} struct {
-		*{{.File}}.{{.Proper}}
-		*{{.File0}}LoginCredentials
-	}
-
-	// {{.Proper}} creates http request for this SKU vault endpoint.
-	// {{.Throttle}} Throttle.
-	// {{.Info}}.
-	func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{{.File}}.{{.Proper}}Response {
-		credPld := &post{{.Proper}} {
-			{{.Proper}}:       pld,
-			{{.File0}}LoginCredentials: lc,
-		}
-
-		response := &{{.File}}.{{.Proper}}Response{}
-		{{.File}}Call(credPld, response, {{.Name}})
-		return response
-	}`
+	funcTemp := templates.Funcs
 
 	inTemp, err := template.New("inventory").Parse(funcTemp)
 	if err != nil {
