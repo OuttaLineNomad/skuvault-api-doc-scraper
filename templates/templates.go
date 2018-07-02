@@ -35,7 +35,7 @@ type {{.Cred}} struct {
 }
 {{end}}
 
-// NewEnvCredSession takes tokens from systems enviomantal varables.
+// NewEnvCredSession takes tokens from systems environmental varables.
 // TENANT_TOKEN and USER_TOKEN
 func NewEnvCredSession() *Ctr {
 	return NewSession(os.Getenv("SV_TENANT_TOKEN"), os.Getenv("SV_USER_TOKEN"))
@@ -51,6 +51,36 @@ func NewSession(tTok, uTok string) *Ctr {
 		},
 		{{end}}
 	}
+}
+
+// postGetTokens payload sent to Sku Vault.
+type postGetTokens struct {
+	*GetTokens
+}
+
+// GetTokensResponse is a automatically generated struct from json provided by skuvault's api docs.
+type GetTokensResponse struct {
+	TenantToken string 
+	UserToken   string
+}
+
+// GetTokens is a automatically generated struct from json provided by skuvault's api docs.
+type GetTokens struct {
+	Email    string
+	Password string
+}
+
+// GetTokensCall creates http request for this SKU vault endpoint.
+// Very Light Throttle.
+// Use this call to retrieve your API tokens from SkuVault using your login email and password..
+func GetTokensCall(pld *GetTokens) *GetTokensResponse {
+	credPld := &postGetTokens{
+		GetTokens: pld,
+	}
+
+	response := &GetTokensResponse{}
+	do(credPld, response, "skuvault/getTokens")
+	return response
 }
 
 // do internal makes calls based on information passed in from other Do calls for each endpoint
@@ -113,7 +143,51 @@ func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{
 	}
 
 	response := &{{.File}}.{{.Proper}}Response{}
-	do(credPld, response, "{{.File}}/{{.Name}}")
+	do(credPld, response, "{{.File}}{{.Name}}")
 	return response
 }`
+
+	readme = `
+# SkuVault 
+
+## Overview
+
+This library supports most if not all of the \60xapp.skuvault.com/api\60x REST calls in go. It was mostly been created automatically by a web scrapper scrapping SkuVault's api [reference](https://dev.skuvault.com/reference) then edited. Please refer to SkuVaults reference site for more info.
+
+## Install
+
+\60x\60x\60x
+go get github.com/OuttaLineNomad/skuvault 
+\60x\60x\60x
+
+## Examples
+
+### Using LeakyBucket
+LeakyBucket sets size 4 bucket. Meaning only 10 calls can be made in a burst. After that the bucket is regulated at the rate of of 4 calls a minute. GetRate does the math for you.
+\60x\60x\60xgo
+func main() {
+	bkt := throttle.LeakyBucket(10, throttle.GetRate(4, time.Minute))
+	for i := 0; i < 100; i++ {
+		bkt.Take()
+		// after this you call you make your call.
+		resp, err := http.Get("http://httpbin.org/get")
+		if err != nil {
+			log.Panic(err)
+		}
+		fmt.Println(resp.StatusCode)
+	}
+}
+\60x\60x\60x
+
+
+## Author
+
+* **Bryce Mullen** - *Project Manager*  @Wedgenix connect [here](https://www.linkedin.com/in/bryce-mullen).
+
+## License
+
+This project is licensed under the AP2 License - see the [LICENSE](LICENSE) file for details
+
+
+`
 )

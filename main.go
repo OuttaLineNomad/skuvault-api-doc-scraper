@@ -1,13 +1,6 @@
 package main
 
-/*
-*
-* Have to collect template data for SV main, and figue out goimports.
-*
- */
-
 import (
-	"fmt"
 	"html/template"
 	"io/ioutil"
 	"log"
@@ -21,8 +14,7 @@ import (
 )
 
 const (
-	// folder = "../skuvault"
-	folder = "../test/skuvault"
+	folder = "../REVIEW_skuvault"
 )
 
 var (
@@ -36,7 +28,6 @@ var (
 	wg         sync.WaitGroup
 
 	infoDone bool
-	// file     = "Undefined"
 
 	rgx, _      = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
 	th2, _      = regexp.Compile(`\s?[tT]hrottling[.:]?\s?`)
@@ -89,31 +80,20 @@ func main() {
 	files = make(chan string, 1)
 	allDoneSon = make(chan bool, 1)
 
-	println("get api docs")
-	// res, err := http.Get("https://dev.skuvault.com/reference")
-	// if err != nil {
-	// 	log.Panicln(err)
-	// }
-
-	// doc := html.NewTokenizer(res.Body)
 	go makeFuncs()
 	go makeStructs()
-	println("starting getEndPoints")
-	// getEndPoints(doc)
-	getEndPointsTest()
+	getEndPoints()
 	allDoneSon <- true
 	wg.Wait()
-	println("go fmt...")
 	exec.Command("go", "fmt", folder).Run()
 	exec.Command("go", "fmt", folder+"/integration/").Run()
 	exec.Command("go", "fmt", folder+"/inventory/").Run()
 	exec.Command("go", "fmt", folder+"/products/").Run()
 	exec.Command("go", "fmt", folder+"/purchaseorders/").Run()
 	exec.Command("go", "fmt", folder+"/sales/").Run()
-	// println("goimports...")
-	// addImports()
 }
 
+// makeSVControl makes the main control file from a template.
 func makeSVControl(company, url string, crd []creds) {
 	svg, err := os.Create(folder + "/skuvault.go")
 	if err != nil {
@@ -134,6 +114,7 @@ func makeSVControl(company, url string, crd []creds) {
 	}
 }
 
+// makeStructs creates type struct from json scraped by scraper.
 func makeStructs() {
 	for {
 		apiStr := <-apiStructs
@@ -163,15 +144,18 @@ func makeStructs() {
 
 		}
 		f.WriteString(`package ` + apiStr[0].File)
-		fileStr := structRename(structStr)
+		fileStr := structStr
 		f.WriteString(fileStr)
 		f.Close()
 	}
 
 }
 
+// makeFuncs is on a go runtime createing functions from the data it is given.
 func makeFuncs() {
 	wg.Add(1)
+
+	// create all the go files seperated by functionality.
 	names := []string{}
 	inF, err := os.Create(folder + "/inventory.go")
 	if err != nil {
@@ -209,6 +193,7 @@ func makeFuncs() {
 	}
 	names = append(names, noF.Name())
 
+	// Create templates for all files
 	funcTemp := templates.Funcs
 
 	inTemp, err := template.New("inventory").Parse(funcTemp)
@@ -258,6 +243,7 @@ func makeFuncs() {
 	}
 	makeSVControl("skuvault", "https://app.skuvault.com/api/", theCreds)
 
+	// add pageage name to all files.
 	inF.WriteString("package skuvault")
 	prF.WriteString("package skuvault")
 	saF.WriteString("package skuvault")
@@ -265,18 +251,16 @@ func makeFuncs() {
 	noF.WriteString("package skuvault")
 	intF.WriteString("package skuvault")
 
+	// Go ruetine wait till all functions are created then run goimports
 	go goImportFuncs(names)
+
+	// for loop to wait for data from scrapper to create functions.
 	for {
 		propStr := <-propCh
-		println("propStr")
 		nameStr := <-nameCh
-		println("nameStr")
 		throttleStr := <-throttle
-		println("throttleStr")
 		infoStr := <-info
-		println("infoStr")
 		filesStr := <-files
-		println("filesStr")
 
 		file0 := ""
 		if filesStr != "" {
@@ -329,28 +313,28 @@ func makeFuncs() {
 	}
 }
 
-func structRename(data string) string {
-	lines := strings.Split(data, "\n")
-	newData := data
-	for _, line := range lines {
-		sub := regexp.MustCompile(`^\s+(?P<key>[^\s]+)\s+[\[\]]*(?P<val>[^\s]+_sub[1-9][0-9]*)`)
-		if !sub.MatchString(line) {
-			continue
-		}
-		key := sub.FindStringSubmatch(line)
-		newData = strings.Replace(newData, key[2], key[1], -1)
-	}
-	return newData
-}
+// structRename renames subs to the actual name.
+// func structRename(data string) string {
+// 	lines := strings.Split(data, "\n")
+// 	newData := data
+// 	for _, line := range lines {
+// 		sub := regexp.MustCompile(`^\s+(?P<key>[^\s]+)\s+[\[\]]*(?P<val>[^\s]+_sub[1-9][0-9]*)`)
+// 		if !sub.MatchString(line) {
+// 			continue
+// 		}
+// 		key := sub.FindStringSubmatch(line)
+// 		newData = strings.Replace(newData, key[2], key[1], -1)
+// 	}
+// 	return newData
+// }
 
+// goImportFuncs uses addImports to add imports to each func file
 func goImportFuncs(names []string) {
 	for {
 		myNames := names
 		select {
 		case <-allDoneSon:
-			println("all done son...")
 			for _, name := range myNames {
-				fmt.Println("GoImporting...", name)
 				addImports(name)
 			}
 			wg.Done()
@@ -359,206 +343,15 @@ func goImportFuncs(names []string) {
 	}
 }
 
+// addImports uses goimports to add the import lines on top of each go file
 func addImports(name string) {
-	fmt.Println("importing:", name)
 	cmd := exec.Command("goimports", name)
-	// src, err := os.Create(name)
-	// if err != nil {
-	// 	println(err.Error())
-	// 	return
-	// }
 	b, err := cmd.Output()
 	if err != nil {
-		println(err.Error())
-		return
+		log.Panic(err)
 	}
 	err = ioutil.WriteFile(name, b, 0644)
 	if err != nil {
 		log.Panic(err)
 	}
-	// _, err = src.Write(b)
-	// if err != nil {
-	// 	log.Panic(err)
-	// }
-	// src.Sync()
-	// src.Close()
 }
-
-// func getEndPoints(doc *html.Tokenizer) {
-// 	name := ""
-
-// 	bothStructs := []apiStructsData{}
-// 	apiCount := 0
-// 	for {
-// 		toks := doc.Next()
-
-// 		switch toks {
-// 		case html.ErrorToken:
-// 			println("done")
-// 			return
-// 		case html.StartTagToken:
-// 			tok := doc.Token()
-// 			if tok.Data == "h2" {
-// 				toks = doc.Next()
-// 				full := doc.Token().Data
-// 				name = strings.Replace(full, "/", "", -1)
-// 				proper := strings.Title(name)
-
-// 				if proper != "Developing For SkuVault" {
-// 					println("Nameing")
-// 					println(proper)
-// 					propCh <- proper
-// 					println("done>>", proper)
-// 					nameCh <- name
-// 				}
-
-// 				continue
-// 			}
-
-// 			if tok.Data == "div" {
-// 				for _, att := range tok.Attr {
-// 					if att.Val == "excerpt" {
-// 						count := 0
-// 					out:
-// 						for {
-// 							toks = doc.Next()
-// 							tok = doc.Token()
-// 							switch toks {
-// 							case html.TextToken:
-// 								if count == 2 {
-// 									continue
-// 								}
-// 								if !rgx.MatchString(tok.Data) {
-// 									count++
-// 									first := th2.ReplaceAllString(tok.Data, "")
-// 									if count == 1 {
-// 										infoDone = false
-// 										println("Throttle")
-// 										throttle <- first
-// 										continue
-// 									}
-// 									info <- first
-// 									infoDone = true
-
-// 								}
-// 							case html.EndTagToken:
-// 								if tok.Data == "p" {
-// 									break out
-// 								}
-// 							}
-// 						}
-// 					}
-// 				}
-// 			}
-
-// 			if tok.Data == "span" {
-
-// 				jsons := ""
-// 				for _, att := range tok.Attr {
-// 					if att.Val == "cm-s-tomorrow-night" {
-// 					out2:
-// 						for {
-// 							toks = doc.Next()
-// 							tok = doc.Token()
-// 							switch toks {
-// 							case html.TextToken:
-// 								if !rgx.MatchString(tok.Data) {
-// 									jsons += tok.Data
-// 								}
-// 							case html.EndTagToken:
-// 								if tok.Data == "pre" {
-// 									ok, _ := regexp.Compile(`"status2",`)
-// 									ok2, _ := regexp.Compile(`}\s*]`)
-// 									f1 := ok.ReplaceAllString(jsons, `"status2"`)
-// 									f2 := f1
-// 									if name == "getTransactions" {
-// 										f2 = ok2.ReplaceAllString(f1, `}}]`)
-// 									}
-// 									jRead := strings.NewReader(f2)
-// 									change := false
-// 									if file == "" {
-// 										file = "skuvault"
-// 										change = true
-// 									}
-// 									StruName := name
-// 									if apiCount == 1 {
-// 										StruName += "Response"
-// 									}
-// 									b, err := gojson.Generate(jRead, gojson.ParseJson, StruName, file, nil, true)
-// 									if err != nil {
-// 										log.Panicln(err)
-// 									}
-// 									apiCount++
-// 									st := apiStructsData{
-// 										Spot:   apiCount,
-// 										Struct: string(b),
-// 										File:   file,
-// 										Name:   name,
-// 									}
-// 									bothStructs = append(bothStructs, st)
-// 									if apiCount == 2 {
-// 										println("adding structs")
-// 										apiStructs <- bothStructs
-// 										bothStructs = []apiStructsData{}
-// 										apiCount = 0
-// 									}
-// 									if change {
-// 										file = ""
-// 									}
-
-// 									break out2
-// 								}
-// 							}
-// 						}
-// 					}
-
-// 					if att.Val == "definition-url" {
-// 						var done bool
-// 						println("yep")
-// 					out3:
-// 						for {
-// 							toks = doc.Next()
-// 							tok = doc.Token()
-// 							switch {
-// 							case toks == html.TextToken:
-// 								println(tok.Data)
-// 								url, _ := regexp.Compile(`app.skuvault.com/api/`)
-// 								file = url.ReplaceAllString(tok.Data, "")
-// 								if file == "app.skuvault.com/api" {
-// 								urlSpan:
-// 									for {
-// 										toks = doc.Next()
-// 										tok = doc.Token()
-// 										switch {
-// 										case toks == html.TextToken:
-// 											if len(tok.Data) == 0 {
-// 												continue urlSpan
-// 											}
-// 											otherURL := strings.Split(tok.Data, "/")
-// 											file = otherURL[1]
-// 											if !fileName.MatchString(file) {
-// 												file = ""
-// 											}
-// 											break urlSpan
-// 										}
-// 									}
-// 								}
-// 								if !infoDone {
-// 									info <- "NONE"
-// 								}
-// 								println("get files")
-// 								files <- file
-// 								done = true
-// 							case done:
-// 								break out3
-// 							}
-// 						}
-// 					}
-
-// 				}
-
-// 			}
-// 		}
-// 	}
-
-// }
