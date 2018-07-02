@@ -7,18 +7,22 @@ package main
  */
 
 import (
+	"fmt"
 	"html/template"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/OuttaLineNomad/skuvault-api-doc-scraper/templates"
 )
 
 const (
-	folder = "../skuvault"
+	// folder = "../skuvault"
+	folder = "../test/skuvault"
 )
 
 var (
@@ -28,6 +32,8 @@ var (
 	throttle   chan string
 	apiStructs chan []apiStructsData
 	files      chan string
+	allDoneSon chan bool
+	wg         sync.WaitGroup
 
 	infoDone bool
 	// file     = "Undefined"
@@ -81,6 +87,7 @@ func main() {
 	throttle = make(chan string, 1)
 	apiStructs = make(chan []apiStructsData)
 	files = make(chan string, 1)
+	allDoneSon = make(chan bool, 1)
 
 	println("get api docs")
 	// res, err := http.Get("https://dev.skuvault.com/reference")
@@ -93,7 +100,9 @@ func main() {
 	go makeStructs()
 	println("starting getEndPoints")
 	// getEndPoints(doc)
-	getEndPoints_test()
+	getEndPointsTest()
+	allDoneSon <- true
+	wg.Wait()
 	println("go fmt...")
 	exec.Command("go", "fmt", folder).Run()
 	exec.Command("go", "fmt", folder+"/integration/").Run()
@@ -103,22 +112,6 @@ func main() {
 	exec.Command("go", "fmt", folder+"/sales/").Run()
 	// println("goimports...")
 	// addImports()
-}
-
-func addImports() {
-	cmd := exec.Command("goimports", folder+"/skuvault.go")
-	src, err := os.Open(folder + "/skuvault.go")
-	if err != nil {
-		println(err.Error())
-		return
-	}
-	b, err := cmd.Output()
-	if err != nil {
-		println(err.Error())
-		return
-	}
-	src.Write(b)
-	src.Close()
 }
 
 func makeSVControl(company, url string, crd []creds) {
@@ -178,30 +171,44 @@ func makeStructs() {
 }
 
 func makeFuncs() {
+	wg.Add(1)
+	names := []string{}
 	inF, err := os.Create(folder + "/inventory.go")
 	if err != nil {
 		log.Panicln(err)
 	}
+	names = append(names, inF.Name())
+
 	prF, err := os.Create(folder + "/products.go")
 	if err != nil {
 		log.Panicln(err)
 	}
+	names = append(names, prF.Name())
+
 	saF, err := os.Create(folder + "/sales.go")
 	if err != nil {
 		log.Panicln(err)
 	}
+	names = append(names, saF.Name())
+
 	poF, err := os.Create(folder + "/purchaseorders.go")
 	if err != nil {
 		log.Panicln(err)
 	}
+	names = append(names, poF.Name())
+
 	intF, err := os.Create(folder + "/integration.go")
 	if err != nil {
 		log.Panicln(err)
 	}
+	names = append(names, intF.Name())
+
 	noF, err := os.Create(folder + "/nocategory.go")
 	if err != nil {
 		log.Panicln(err)
 	}
+	names = append(names, noF.Name())
+
 	funcTemp := templates.Funcs
 
 	inTemp, err := template.New("inventory").Parse(funcTemp)
@@ -229,6 +236,28 @@ func makeFuncs() {
 		log.Panicln(err)
 	}
 
+	// make creds for skuvault file to control all funcs
+	theCreds := []creds{}
+	fileNames := []string{"inventory", "products", "sales", "purchaseorders", "integration", "skuvault"}
+	for _, name := range fileNames {
+		start := strings.ToUpper(string(name[0]))
+		if name == "skuvault" {
+			start = ""
+		}
+		if name == "purchaseorders" {
+			start = "PO"
+		}
+		if name == "integration" {
+			start = "IN"
+		}
+		c := creds{
+			Cred: start + "LoginCredentials",
+			Name: name,
+		}
+		theCreds = append(theCreds, c)
+	}
+	makeSVControl("skuvault", "https://app.skuvault.com/api/", theCreds)
+
 	inF.WriteString("package skuvault")
 	prF.WriteString("package skuvault")
 	saF.WriteString("package skuvault")
@@ -236,6 +265,7 @@ func makeFuncs() {
 	noF.WriteString("package skuvault")
 	intF.WriteString("package skuvault")
 
+	go goImportFuncs(names)
 	for {
 		propStr := <-propCh
 		println("propStr")
@@ -295,7 +325,6 @@ func makeFuncs() {
 			if err != nil {
 				log.Panicln(err)
 			}
-
 		}
 	}
 }
@@ -312,6 +341,47 @@ func structRename(data string) string {
 		newData = strings.Replace(newData, key[2], key[1], -1)
 	}
 	return newData
+}
+
+func goImportFuncs(names []string) {
+	for {
+		myNames := names
+		select {
+		case <-allDoneSon:
+			println("all done son...")
+			for _, name := range myNames {
+				fmt.Println("GoImporting...", name)
+				addImports(name)
+			}
+			wg.Done()
+			return
+		}
+	}
+}
+
+func addImports(name string) {
+	fmt.Println("importing:", name)
+	cmd := exec.Command("goimports", name)
+	// src, err := os.Create(name)
+	// if err != nil {
+	// 	println(err.Error())
+	// 	return
+	// }
+	b, err := cmd.Output()
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	err = ioutil.WriteFile(name, b, 0644)
+	if err != nil {
+		log.Panic(err)
+	}
+	// _, err = src.Write(b)
+	// if err != nil {
+	// 	log.Panic(err)
+	// }
+	// src.Sync()
+	// src.Close()
 }
 
 // func getEndPoints(doc *html.Tokenizer) {

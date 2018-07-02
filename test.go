@@ -30,7 +30,7 @@ var (
 	rgID = regexp.MustCompile(`[a-z]+`)
 )
 
-func getEndPoints_test() {
+func getEndPointsTest() {
 	// func main() {
 	doc, err := htmlquery.LoadURL("https://dev.skuvault.com/reference")
 	if err != nil {
@@ -98,12 +98,22 @@ func getThrottle(n *html.Node, doc *html.Node) []string {
 	return []string{firstChild, secondChild}
 }
 
+func commentStructs(data string) string {
+	typeStruct := regexp.MustCompile(`type ([a-zA-Z]+) struct {`)
+	myStrucst := typeStruct.FindAllStringSubmatch(data, -1)
+	for _, st := range myStrucst {
+		repl := `// ` + st[1] + ` is a automatically generated struct from json provided by skuvault's api docs.` + "\n" + st[0]
+		data = strings.Replace(data, st[0], repl, -1)
+	}
+	return data
+}
+
 func getPost(file, name string, n *html.Node, doc *html.Node) []apiStructsData {
 	xPath := getID(n, post)
 	areaP := htmlquery.FindOne(doc, xPath)
 	posts := htmlquery.InnerText(areaP)
 	pwj := washJSON(posts, name)
-	poStuct, err := gojson.Generate(pwj, gojson.ParseJson, name, file, nil, false)
+	poStuct, err := gojson.Generate(pwj, gojson.ParseJson, strings.Title(name), file, []string{"json"}, false)
 	if err != nil {
 		fmt.Println(pwj)
 		log.Panicln(err)
@@ -113,21 +123,20 @@ func getPost(file, name string, n *html.Node, doc *html.Node) []apiStructsData {
 	areaR := htmlquery.FindOne(doc, xPath)
 	resps := htmlquery.InnerText(areaR)
 	rwj := washJSON(resps, name)
-	reStuct, err := gojson.Generate(rwj, gojson.ParseJson, name+"Response", file, nil, false)
+	reStuct, err := gojson.Generate(rwj, gojson.ParseJson, strings.Title(name)+"Response", file, []string{"json"}, false)
 	if err != nil {
 		fmt.Println(resps)
 		log.Panicln(err)
 	}
-
 	postStruct := apiStructsData{
 		Spot:   1,
-		Struct: string(poStuct),
+		Struct: commentStructs(string(poStuct)),
 		File:   file,
 		Name:   name,
 	}
 	repStruct := apiStructsData{
 		Spot:   2,
-		Struct: string(reStuct),
+		Struct: commentStructs(string(reStuct)),
 		File:   file,
 		Name:   name,
 	}
@@ -144,6 +153,7 @@ func washJSON(jsons, name string) io.Reader {
 	if name == "getTransactions" {
 		f2 = ok2.ReplaceAllString(f1, `}}]`)
 	}
+
 	return strings.NewReader(f2)
 
 }

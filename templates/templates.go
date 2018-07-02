@@ -113,7 +113,7 @@ func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) *{
 	}
 
 	response := &{{.File}}.{{.Proper}}Response{}
-	{{.File}}Call(credPld, response, {{.Name}})
+	do(credPld, response, "{{.File}}/{{.Name}}")
 	return response
 }`
 )
