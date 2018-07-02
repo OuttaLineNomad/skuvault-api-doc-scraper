@@ -9,15 +9,12 @@ package main
 import (
 	"html/template"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 
-	"github.com/ChimeraCoder/gojson"
 	"github.com/OuttaLineNomad/skuvault-api-doc-scraper/templates"
-	"golang.org/x/net/html"
 )
 
 const (
@@ -33,6 +30,7 @@ var (
 	files      chan string
 
 	infoDone bool
+	// file     = "Undefined"
 
 	rgx, _      = regexp.Compile(`\s?[tT]hrottling[.:]?\s?$`)
 	th2, _      = regexp.Compile(`\s?[tT]hrottling[.:]?\s?`)
@@ -80,21 +78,22 @@ func main() {
 	nameCh = make(chan string)
 	propCh = make(chan string)
 	info = make(chan string)
-	throttle = make(chan string)
+	throttle = make(chan string, 1)
 	apiStructs = make(chan []apiStructsData)
-	files = make(chan string)
+	files = make(chan string, 1)
 
 	println("get api docs")
-	res, err := http.Get("https://dev.skuvault.com/reference")
-	if err != nil {
-		log.Panicln(err)
-	}
+	// res, err := http.Get("https://dev.skuvault.com/reference")
+	// if err != nil {
+	// 	log.Panicln(err)
+	// }
 
-	doc := html.NewTokenizer(res.Body)
+	// doc := html.NewTokenizer(res.Body)
 	go makeFuncs()
 	go makeStructs()
 	println("starting getEndPoints")
-	getEndPoints(doc)
+	// getEndPoints(doc)
+	getEndPoints_test()
 	println("go fmt...")
 	exec.Command("go", "fmt", folder).Run()
 	exec.Command("go", "fmt", folder+"/integration/").Run()
@@ -102,8 +101,8 @@ func main() {
 	exec.Command("go", "fmt", folder+"/products/").Run()
 	exec.Command("go", "fmt", folder+"/purchaseorders/").Run()
 	exec.Command("go", "fmt", folder+"/sales/").Run()
-	println("goimports...")
-	addImports()
+	// println("goimports...")
+	// addImports()
 }
 
 func addImports() {
@@ -315,177 +314,181 @@ func structRename(data string) string {
 	return newData
 }
 
-func getEndPoints(doc *html.Tokenizer) {
-	name := ""
-	file := ""
-	bothStructs := []apiStructsData{}
-	apiCount := 0
-	for {
-		toks := doc.Next()
+// func getEndPoints(doc *html.Tokenizer) {
+// 	name := ""
 
-		switch toks {
-		case html.ErrorToken:
-			println("done")
-			return
-		case html.StartTagToken:
-			tok := doc.Token()
-			if tok.Data == "h2" {
-				toks = doc.Next()
-				full := doc.Token().Data
-				name = strings.Replace(full, "/", "", -1)
-				proper := strings.Title(name)
+// 	bothStructs := []apiStructsData{}
+// 	apiCount := 0
+// 	for {
+// 		toks := doc.Next()
 
-				if proper != "Developing For SkuVault" {
-					println("Nameing")
-					propCh <- proper
-					nameCh <- name
-				}
+// 		switch toks {
+// 		case html.ErrorToken:
+// 			println("done")
+// 			return
+// 		case html.StartTagToken:
+// 			tok := doc.Token()
+// 			if tok.Data == "h2" {
+// 				toks = doc.Next()
+// 				full := doc.Token().Data
+// 				name = strings.Replace(full, "/", "", -1)
+// 				proper := strings.Title(name)
 
-				continue
-			}
+// 				if proper != "Developing For SkuVault" {
+// 					println("Nameing")
+// 					println(proper)
+// 					propCh <- proper
+// 					println("done>>", proper)
+// 					nameCh <- name
+// 				}
 
-			if tok.Data == "div" {
-				for _, att := range tok.Attr {
-					if att.Val == "excerpt" {
-						count := 0
-					out:
-						for {
-							toks = doc.Next()
-							tok = doc.Token()
-							switch toks {
-							case html.TextToken:
-								if count == 2 {
-									continue
-								}
-								if !rgx.MatchString(tok.Data) {
-									count++
-									first := th2.ReplaceAllString(tok.Data, "")
-									if count == 1 {
-										infoDone = false
-										println("Throttle")
-										throttle <- first
-										continue
-									}
-									info <- first
-									infoDone = true
+// 				continue
+// 			}
 
-								}
-							case html.EndTagToken:
-								if tok.Data == "p" {
-									break out
-								}
-							}
-						}
-					}
-				}
-			}
+// 			if tok.Data == "div" {
+// 				for _, att := range tok.Attr {
+// 					if att.Val == "excerpt" {
+// 						count := 0
+// 					out:
+// 						for {
+// 							toks = doc.Next()
+// 							tok = doc.Token()
+// 							switch toks {
+// 							case html.TextToken:
+// 								if count == 2 {
+// 									continue
+// 								}
+// 								if !rgx.MatchString(tok.Data) {
+// 									count++
+// 									first := th2.ReplaceAllString(tok.Data, "")
+// 									if count == 1 {
+// 										infoDone = false
+// 										println("Throttle")
+// 										throttle <- first
+// 										continue
+// 									}
+// 									info <- first
+// 									infoDone = true
 
-			if tok.Data == "span" {
+// 								}
+// 							case html.EndTagToken:
+// 								if tok.Data == "p" {
+// 									break out
+// 								}
+// 							}
+// 						}
+// 					}
+// 				}
+// 			}
 
-				jsons := ""
-				for _, att := range tok.Attr {
-					if att.Val == "cm-s-tomorrow-night" {
-					out2:
-						for {
-							toks = doc.Next()
-							tok = doc.Token()
-							switch toks {
-							case html.TextToken:
-								if !rgx.MatchString(tok.Data) {
-									jsons += tok.Data
-								}
-							case html.EndTagToken:
-								if tok.Data == "pre" {
-									ok, _ := regexp.Compile(`"status2",`)
-									ok2, _ := regexp.Compile(`}\s*]`)
-									f1 := ok.ReplaceAllString(jsons, `"status2"`)
-									f2 := f1
-									if name == "getTransactions" {
-										f2 = ok2.ReplaceAllString(f1, `}}]`)
-									}
-									jRead := strings.NewReader(f2)
-									change := false
-									if file == "" {
-										file = "skuvault"
-										change = true
-									}
-									StruName := name
-									if apiCount == 1 {
-										StruName += "Response"
-									}
-									b, err := gojson.Generate(jRead, gojson.ParseJson, StruName, file, nil, true)
-									if err != nil {
-										log.Panicln(err)
-									}
-									apiCount++
-									st := apiStructsData{
-										Spot:   apiCount,
-										Struct: string(b),
-										File:   file,
-										Name:   name,
-									}
-									bothStructs = append(bothStructs, st)
-									if apiCount == 2 {
-										println("adding structs")
-										apiStructs <- bothStructs
-										bothStructs = []apiStructsData{}
-										apiCount = 0
-									}
-									if change {
-										file = ""
-									}
+// 			if tok.Data == "span" {
 
-									break out2
-								}
-							}
-						}
-					}
+// 				jsons := ""
+// 				for _, att := range tok.Attr {
+// 					if att.Val == "cm-s-tomorrow-night" {
+// 					out2:
+// 						for {
+// 							toks = doc.Next()
+// 							tok = doc.Token()
+// 							switch toks {
+// 							case html.TextToken:
+// 								if !rgx.MatchString(tok.Data) {
+// 									jsons += tok.Data
+// 								}
+// 							case html.EndTagToken:
+// 								if tok.Data == "pre" {
+// 									ok, _ := regexp.Compile(`"status2",`)
+// 									ok2, _ := regexp.Compile(`}\s*]`)
+// 									f1 := ok.ReplaceAllString(jsons, `"status2"`)
+// 									f2 := f1
+// 									if name == "getTransactions" {
+// 										f2 = ok2.ReplaceAllString(f1, `}}]`)
+// 									}
+// 									jRead := strings.NewReader(f2)
+// 									change := false
+// 									if file == "" {
+// 										file = "skuvault"
+// 										change = true
+// 									}
+// 									StruName := name
+// 									if apiCount == 1 {
+// 										StruName += "Response"
+// 									}
+// 									b, err := gojson.Generate(jRead, gojson.ParseJson, StruName, file, nil, true)
+// 									if err != nil {
+// 										log.Panicln(err)
+// 									}
+// 									apiCount++
+// 									st := apiStructsData{
+// 										Spot:   apiCount,
+// 										Struct: string(b),
+// 										File:   file,
+// 										Name:   name,
+// 									}
+// 									bothStructs = append(bothStructs, st)
+// 									if apiCount == 2 {
+// 										println("adding structs")
+// 										apiStructs <- bothStructs
+// 										bothStructs = []apiStructsData{}
+// 										apiCount = 0
+// 									}
+// 									if change {
+// 										file = ""
+// 									}
 
-					if att.Val == "definition-url" {
-						var done bool
-					out3:
-						for {
-							toks = doc.Next()
-							tok = doc.Token()
-							switch {
-							case toks == html.TextToken:
-								url, _ := regexp.Compile(`app.skuvault.com/api/`)
-								file = url.ReplaceAllString(tok.Data, "")
-								if file == "app.skuvault.com/api" {
-								urlSpan:
-									for {
-										toks = doc.Next()
-										tok = doc.Token()
-										switch {
-										case toks == html.TextToken:
-											if len(tok.Data) == 0 {
-												continue urlSpan
-											}
-											otherURL := strings.Split(tok.Data, "/")
-											file = otherURL[1]
-											if !fileName.MatchString(file) {
-												file = ""
-											}
-											break urlSpan
-										}
-									}
-								}
-								if !infoDone {
-									info <- "NONE"
-								}
-								println("get files")
-								files <- file
-								done = true
-							case done:
-								break out3
-							}
-						}
-					}
+// 									break out2
+// 								}
+// 							}
+// 						}
+// 					}
 
-				}
+// 					if att.Val == "definition-url" {
+// 						var done bool
+// 						println("yep")
+// 					out3:
+// 						for {
+// 							toks = doc.Next()
+// 							tok = doc.Token()
+// 							switch {
+// 							case toks == html.TextToken:
+// 								println(tok.Data)
+// 								url, _ := regexp.Compile(`app.skuvault.com/api/`)
+// 								file = url.ReplaceAllString(tok.Data, "")
+// 								if file == "app.skuvault.com/api" {
+// 								urlSpan:
+// 									for {
+// 										toks = doc.Next()
+// 										tok = doc.Token()
+// 										switch {
+// 										case toks == html.TextToken:
+// 											if len(tok.Data) == 0 {
+// 												continue urlSpan
+// 											}
+// 											otherURL := strings.Split(tok.Data, "/")
+// 											file = otherURL[1]
+// 											if !fileName.MatchString(file) {
+// 												file = ""
+// 											}
+// 											break urlSpan
+// 										}
+// 									}
+// 								}
+// 								if !infoDone {
+// 									info <- "NONE"
+// 								}
+// 								println("get files")
+// 								files <- file
+// 								done = true
+// 							case done:
+// 								break out3
+// 							}
+// 						}
+// 					}
 
-			}
-		}
-	}
+// 				}
 
-}
+// 			}
+// 		}
+// 	}
+
+// }
