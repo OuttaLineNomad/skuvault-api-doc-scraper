@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	folder = "../REVIEW_skuvault"
+	folder = "REVIEW_skuvault"
 )
 
 var (
