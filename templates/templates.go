@@ -19,6 +19,7 @@ const (
 	url = "{{.URL}}"
 )
 
+// Error struct to store custom error message.
 type Error struct {
 	Func string
 	Err  error
