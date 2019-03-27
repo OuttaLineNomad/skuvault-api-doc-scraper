@@ -99,7 +99,7 @@ func commentStructs(data string) string {
 	data = toks.ReplaceAllString(data, "")
 	myStrucs := typeStruct.FindAllStringSubmatch(data, -1)
 	for _, st := range myStrucs {
-		repl := `// ` + st[1] + ` is a automatically generated struct from json provided by skuvault's api docs.` + "\n" + st[0]
+		repl := `// ` + st[1] + ` is a automatically generated struct from json provided by sku vault's api docs.` + "\n" + st[0]
 		data = strings.Replace(data, st[0], repl, -1)
 	}
 	return data
@@ -111,7 +111,7 @@ func getPost(file, name string, n *html.Node, doc *html.Node) []apiStructsData {
 	areaP := htmlquery.FindOne(doc, xPath)
 	posts := htmlquery.InnerText(areaP)
 	pwj := washJSON(posts, name)
-	poStruct, err := gojson.Generate(pwj, gojson.ParseJson, strings.Title(name), file, []string{"json"}, false)
+	poStruct, err := gojson.Generate(pwj, gojson.ParseJson, strings.Title(name), file, []string{"json"}, false, true)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -120,7 +120,7 @@ func getPost(file, name string, n *html.Node, doc *html.Node) []apiStructsData {
 	areaR := htmlquery.FindOne(doc, xPath)
 	resps := htmlquery.InnerText(areaR)
 	rwj := washJSON(resps, name)
-	reStruct, err := gojson.Generate(rwj, gojson.ParseJson, strings.Title(name)+"Response", file, []string{"json"}, false)
+	reStruct, err := gojson.Generate(rwj, gojson.ParseJson, strings.Title(name)+"Response", file, []string{"json"}, false, true)
 	if err != nil {
 		log.Panicln(err)
 	}
@@ -152,5 +152,4 @@ func washJSON(jsons, name string) io.Reader {
 	}
 
 	return strings.NewReader(f2)
-
 }

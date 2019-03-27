@@ -2,6 +2,7 @@ package main
 
 import (
 	"html/template"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	folder = "REVIEW_skuvault"
+	folder = "../skuvault"
 )
 
 var (
@@ -36,8 +37,9 @@ var (
 )
 
 type creds struct {
-	Name string
-	Cred string
+	Name   string
+	Cred   string
+	Proper string
 }
 
 type svgTemplateTags struct {
@@ -91,6 +93,33 @@ func main() {
 	exec.Command("go", "fmt", folder+"/products/").Run()
 	exec.Command("go", "fmt", folder+"/purchaseorders/").Run()
 	exec.Command("go", "fmt", folder+"/sales/").Run()
+	addReadLicense()
+}
+
+// addReadLicense adds readme file and license to review folder.
+func addReadLicense() {
+	lic, err := os.Open("templates/LICENSE")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	rm, err := os.Open("templates/README.md")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	licD, err := os.Create(folder + "/LICENSE")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	rmD, err := os.Create(folder + "/README.md")
+	if err != nil {
+		log.Panicln(err)
+	}
+
+	io.Copy(licD, lic)
+	io.Copy(rmD, rm)
 }
 
 // makeSVControl makes the main control file from a template.
@@ -187,11 +216,11 @@ func makeFuncs() {
 	}
 	names = append(names, intF.Name())
 
-	noF, err := os.Create(folder + "/nocategory.go")
-	if err != nil {
-		log.Panicln(err)
-	}
-	names = append(names, noF.Name())
+	// noF, err := os.Create(folder + "/nocategory.go")
+	// if err != nil {
+	// 	log.Panicln(err)
+	// }
+	// names = append(names, noF.Name())
 
 	// Create templates for all files
 	funcTemp := templates.Funcs
@@ -216,14 +245,14 @@ func makeFuncs() {
 	if err != nil {
 		log.Panicln(err)
 	}
-	noTemp, err := template.New("noTemp").Parse(strings.Replace(funcTemp, "{{.File}}.", "", -1))
-	if err != nil {
-		log.Panicln(err)
-	}
+	// noTemp, err := template.New("noTemp").Parse(strings.Replace(funcTemp, "{{.File}}.", "", -1))
+	// if err != nil {
+	// 	log.Panicln(err)
+	// }
 
 	// make creds for skuvault file to control all funcs
 	theCreds := []creds{}
-	fileNames := []string{"inventory", "products", "sales", "purchaseorders", "integration", "skuvault"}
+	fileNames := []string{"inventory", "products", "sales", "purchaseorders", "integration"}
 	for _, name := range fileNames {
 		start := strings.ToUpper(string(name[0]))
 		if name == "skuvault" {
@@ -236,8 +265,9 @@ func makeFuncs() {
 			start = "IN"
 		}
 		c := creds{
-			Cred: start + "LoginCredentials",
-			Name: name,
+			Cred:   start + "LoginCredentials",
+			Name:   name,
+			Proper: strings.Title(name),
 		}
 		theCreds = append(theCreds, c)
 	}
@@ -248,7 +278,7 @@ func makeFuncs() {
 	prF.WriteString("package skuvault")
 	saF.WriteString("package skuvault")
 	poF.WriteString("package skuvault")
-	noF.WriteString("package skuvault")
+	// noF.WriteString("package skuvault")
 	intF.WriteString("package skuvault")
 
 	// Go ruetine wait till all functions are created then run goimports
@@ -304,11 +334,12 @@ func makeFuncs() {
 				log.Panicln(err)
 			}
 		default:
-			tags.File0 = ""
-			err = noTemp.Execute(noF, tags)
-			if err != nil {
-				log.Panicln(err)
-			}
+			println("no category to send file.", filesStr)
+			// tags.File0 = ""
+			// err = noTemp.Execute(noF, tags)
+			// if err != nil {
+			// 	log.Panicln(err)
+			// }
 		}
 	}
 }
