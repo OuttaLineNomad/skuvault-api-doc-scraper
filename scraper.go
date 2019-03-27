@@ -94,6 +94,10 @@ func getThrottle(n *html.Node, doc *html.Node) []string {
 
 // commentStructs adds comments to the structures that are made by the system.
 func commentStructs(data string) string {
+	skuas := regexp.MustCompile(`struct \{\n\t+SKUasKey \[\]struct {`)
+	clenUp := regexp.MustCompile(`} .json:"SKUasKey".`)
+	data = skuas.ReplaceAllString(data, "map[string]struct {")
+	data = clenUp.ReplaceAllString(data, "")
 	typeStruct := regexp.MustCompile(`type ([a-zA-Z]+) struct {`)
 	toks := regexp.MustCompile(`[TU][a-z]+[T][a-z]+\s+string\s+\x60json:"[TU][a-z]+[T][a-z]+"\x60\n`)
 	data = toks.ReplaceAllString(data, "")
@@ -110,6 +114,7 @@ func getPost(file, name string, n *html.Node, doc *html.Node) []apiStructsData {
 	xPath := getID(n, post)
 	areaP := htmlquery.FindOne(doc, xPath)
 	posts := htmlquery.InnerText(areaP)
+	posts = strings.Replace(posts, "-", "", -1)
 	pwj := washJSON(posts, name)
 	poStruct, err := gojson.Generate(pwj, gojson.ParseJson, strings.Title(name), file, []string{"json"}, false, true)
 	if err != nil {
@@ -119,6 +124,7 @@ func getPost(file, name string, n *html.Node, doc *html.Node) []apiStructsData {
 	xPath = getID(n, returnz)
 	areaR := htmlquery.FindOne(doc, xPath)
 	resps := htmlquery.InnerText(areaR)
+	resps = strings.Replace(resps, "-", "", -1)
 	rwj := washJSON(resps, name)
 	reStruct, err := gojson.Generate(rwj, gojson.ParseJson, strings.Title(name)+"Response", file, []string{"json"}, false, true)
 	if err != nil {

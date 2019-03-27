@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -163,7 +162,7 @@ func (lc *{{.File0}}LoginCredentials) {{.Proper}}(pld *{{.File}}.{{.Proper}}) (*
 	if err != nil {
 		return nil, &Error{"{{.Proper}}()", err}
 	}
-	
+
 	return response, nil
 }`
 )
